@@ -13,10 +13,11 @@ interface MapProps {
   showAirportLabels: boolean;
   showRadar: boolean;
   showSatellite: boolean;
+  autoMoveEnabled: boolean;
   onRefreshAirport?: (icao: string) => Promise<void>;
 }
 
-export default function Map({ airportMETARs, center, zoom, windToggleEnabled, showAirportLabels, showRadar, showSatellite, onRefreshAirport }: MapProps) {
+export default function Map({ airportMETARs, center, zoom, windToggleEnabled, showAirportLabels, showRadar, showSatellite, autoMoveEnabled, onRefreshAirport }: MapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.CircleMarker[]>([]);
   const coreMarkersRef = useRef<L.CircleMarker[]>([]);
@@ -29,6 +30,12 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
   const [showWinds, setShowWinds] = useState(false);
   const radarLayerRef = useRef<L.TileLayer | null>(null);
   const satelliteLayerRef = useRef<L.TileLayer | null>(null);
+  
+  // Auto-move state
+  const autoMoveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const currentAngleRef = useRef<number>(0);
+  const isMovingRef = useRef<boolean>(false);
+  const initialCenterRef = useRef<[number, number] | null>(null);
 
   // Helper function to generate a consistent delay based on ICAO code
   const getStaggerDelay = (icao: string): number => {
@@ -41,7 +48,68 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
     return Math.abs(hash) % 1500; // Delay between 0-1500ms
   };
 
+  // Small circular movement pattern to prevent burn-in (just a few pixels)
+  // Calculate positions in a circle around current center
+  const getCircularPosition = (center: [number, number], angle: number, radiusDegrees: number): [number, number] => {
+    // Convert angle from degrees to radians
+    const angleRad = (angle * Math.PI) / 180;
+    // Small radius: approximately 0.01 degrees (roughly 1km or a few pixels at typical zoom)
+    const lat = center[0] + radiusDegrees * Math.cos(angleRad);
+    const lon = center[1] + radiusDegrees * Math.sin(angleRad) / Math.cos(center[0] * Math.PI / 180);
+    return [lat, lon];
+  };
+
   useEffect(() => {
+    // Perform small circular movement to prevent burn-in (just a few pixels)
+    const performAutoMove = () => {
+      if (!mapRef.current || isMovingRef.current) {
+        console.log('[AutoMove] Skipping - map not ready or already moving', { 
+          mapReady: !!mapRef.current, 
+          isMoving: isMovingRef.current 
+        });
+        return;
+      }
+
+      // Store initial center on first move
+      if (!initialCenterRef.current) {
+        const currentCenter = mapRef.current.getCenter();
+        initialCenterRef.current = [currentCenter.lat, currentCenter.lng];
+      }
+
+      isMovingRef.current = true;
+      const currentZoom = mapRef.current.getZoom();
+      
+      // Small radius: 0.005 degrees (roughly 500m or a few pixels at zoom 7-10)
+      // Adjust radius based on zoom - smaller at higher zoom
+      const baseRadius = 0.005;
+      const zoomFactor = Math.max(0.5, Math.min(1.5, 10 / currentZoom));
+      const radiusDegrees = baseRadius * zoomFactor;
+      
+      // Calculate next position in circle (move 30 degrees each time)
+      const newPosition = getCircularPosition(initialCenterRef.current, currentAngleRef.current, radiusDegrees);
+      
+      console.log('[AutoMove] Moving in circle', { 
+        angle: currentAngleRef.current, 
+        radius: radiusDegrees,
+        position: newPosition 
+      });
+      
+      // Pan to new position with smooth animation (keep current zoom level)
+      mapRef.current.flyTo(newPosition, currentZoom, {
+        duration: 1.5,
+        easeLinearity: 0.25
+      });
+
+      // After movement completes, mark as ready for next move
+      setTimeout(() => {
+        isMovingRef.current = false;
+        console.log('[AutoMove] Movement complete, ready for next');
+      }, 1500); // Wait for animation to complete
+
+      // Move to next angle in circle (30 degrees per step = 12 steps for full circle)
+      currentAngleRef.current = (currentAngleRef.current + 30) % 360;
+    };
+
     // Initialize map
     if (!mapRef.current) {
       mapRef.current = L.map('map', {
@@ -49,6 +117,8 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
         zoom,
         zoomControl: true,
         attributionControl: true,
+        wheelPxPerZoomLevel: 120, // More pixels needed per zoom level (default is 60) - makes zoom more gradual
+        zoomDelta: 0.5, // Smaller zoom increments (default is 1) - makes zoom smoother
       });
 
       // Add dark mode tile layer (CartoDB Dark Matter)
@@ -61,8 +131,29 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
         maxZoom: 19
       }).addTo(mapRef.current);
       
+      // Set map container background to black for unloaded tiles
+      const mapContainer = document.getElementById('map');
+      if (mapContainer) {
+        mapContainer.style.backgroundColor = '#000000';
+      }
+      
       // Note: Raster tiles are pre-rendered and cannot filter specific features like small water bodies.
       // To hide small water bodies, you would need to use vector tiles with custom styling.
+    }
+
+    // Auto-move effect
+    // Clear existing interval
+    if (autoMoveIntervalRef.current) {
+      clearInterval(autoMoveIntervalRef.current);
+      autoMoveIntervalRef.current = null;
+    }
+
+    if (autoMoveEnabled && mapRef.current) {
+      // Start auto-move immediately, then every 10 seconds
+      performAutoMove();
+      autoMoveIntervalRef.current = setInterval(() => {
+        performAutoMove();
+      }, 10000); // 10 seconds
     }
 
     // Cleanup function
@@ -71,8 +162,12 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
         mapRef.current.remove();
         mapRef.current = null;
       }
+      if (autoMoveIntervalRef.current) {
+        clearInterval(autoMoveIntervalRef.current);
+        autoMoveIntervalRef.current = null;
+      }
     };
-  }, []);
+  }, [autoMoveEnabled]);
 
   // Initialize and update radar layer when visibility changes
   useEffect(() => {

@@ -69,3 +69,12 @@ body {
   will-change: opacity;
 }
 
+/* Dark background for unloaded map tiles */
+.leaflet-container {
+  background-color: #000000 !important;
+}
+
+.leaflet-tile-container img {
+  background-color: #000000;
+}
+

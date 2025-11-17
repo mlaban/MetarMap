@@ -24,6 +24,7 @@ function App() {
   const [showAirportLabels, setShowAirportLabels] = useState(true);
   const [showRadar, setShowRadar] = useState(false);
   const [showSatellite, setShowSatellite] = useState(false);
+  const [autoMoveEnabled, setAutoMoveEnabled] = useState(false);
   const lastRefreshTimeRef = useRef<number>(0);
 
   const loadWeatherData = useCallback(async (isRefresh = false, forceRefresh = false) => {
@@ -141,6 +142,7 @@ function App() {
         showAirportLabels={showAirportLabels}
         showRadar={showRadar}
         showSatellite={showSatellite}
+        autoMoveEnabled={autoMoveEnabled}
         onRefreshAirport={async (icao: string) => {
           // Check rate limit before allowing individual airport refresh
           const now = Date.now();
@@ -174,6 +176,8 @@ function App() {
         onShowRadarChange={setShowRadar}
         showSatellite={showSatellite}
         onShowSatelliteChange={setShowSatellite}
+        autoMoveEnabled={autoMoveEnabled}
+        onAutoMoveChange={setAutoMoveEnabled}
       />
       <AirportOverlay 
         airportMETARs={airportMETARs}

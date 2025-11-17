@@ -15,6 +15,10 @@ export const NY_AREA_AIRPORTS: Airport[] = [
   { icao: 'KLDJ', name: 'Linden Airport', latitude: 40.6174, longitude: -74.2446 },
   { icao: 'KSMQ', name: 'Somerset Airport', latitude: 40.6259, longitude: -74.6702 },
   { icao: 'KBLM', name: 'Monmouth Executive Airport', latitude: 40.1867, longitude: -74.1247 },
+  { icao: 'KMTP', name: 'Montauk Airport', latitude: 41.0769, longitude: -71.9200 },
+  { icao: 'KJPX', name: 'Jamaica Bay Airport', latitude: 40.6217, longitude: -73.7892 },
+  { icao: 'KFOK', name: 'Francis S. Gabreski Airport', latitude: 40.8436, longitude: -72.6317 },
+  { icao: 'KHWV', name: 'Brookhaven Airport', latitude: 40.8167, longitude: -72.8667 },
   { icao: 'KALB', name: 'Albany International Airport', latitude: 42.7483, longitude: -73.8017 },
   { icao: 'KSYR', name: 'Syracuse Hancock International', latitude: 43.1112, longitude: -76.1063 },
   { icao: 'KBUF', name: 'Buffalo Niagara International', latitude: 42.9405, longitude: -78.7322 },
@@ -51,7 +55,6 @@ export const NY_AREA_AIRPORTS: Airport[] = [
   { icao: 'K12N', name: 'Aeroflex-Andover Airport', latitude: 41.0083, longitude: -74.7375 },
   { icao: 'KN07', name: 'Lincoln Park Airport', latitude: 40.9475, longitude: -74.3150 },
   { icao: 'KN40', name: 'Sky Manor Airport', latitude: 40.5653, longitude: -74.9781 },
-  { icao: 'K47N', name: 'Central Jersey Regional Airport', latitude: 40.3994, longitude: -74.3178 },
   { icao: 'KN81', name: 'Hammonton Municipal Airport', latitude: 39.6675, longitude: -74.7547 },
   { icao: 'K17N', name: 'Cross Keys Airport', latitude: 39.7047, longitude: -75.0331 },
   { icao: 'KN14', name: 'Flying W Airport', latitude: 40.0139, longitude: -74.5958 },
@@ -123,7 +126,7 @@ export const NY_AREA_AIRPORTS: Airport[] = [
   { icao: 'KPVD', name: 'T.F. Green Airport', latitude: 41.7326, longitude: -71.4204 },
   { icao: 'KOQU', name: 'Quonset State Airport', latitude: 41.5971, longitude: -71.4122 },
   { icao: 'KUUU', name: 'Newport State Airport', latitude: 41.5325, longitude: -71.2819 },
-  { icao: 'K1B8', name: 'Block Island State Airport', latitude: 41.1681, longitude: -71.5778 },
+  { icao: 'KBID', name: 'Block Island State Airport', latitude: 41.1681, longitude: -71.5778 },
   
   // Vermont
   { icao: 'KBTV', name: 'Burlington International Airport', latitude: 44.4719, longitude: -73.1533 },

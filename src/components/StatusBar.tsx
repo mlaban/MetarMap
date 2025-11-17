@@ -11,6 +11,8 @@ interface StatusBarProps {
   onShowRadarChange: (show: boolean) => void;
   showSatellite: boolean;
   onShowSatelliteChange: (show: boolean) => void;
+  autoMoveEnabled: boolean;
+  onAutoMoveChange: (enabled: boolean) => void;
 }
 
 const LegendDot = ({ color, label }: { color: string; label: string }) => {
@@ -82,7 +84,7 @@ const BlinkingLegendDot = ({ color, label }: { color: string; label: string }) =
   );
 };
 
-export default function StatusBar({ lastUpdate, isRefreshing, windToggleEnabled, onWindToggleChange, showAirportLabels, onShowAirportLabelsChange, showRadar, onShowRadarChange, showSatellite, onShowSatelliteChange }: StatusBarProps) {
+export default function StatusBar({ lastUpdate, isRefreshing, windToggleEnabled, onWindToggleChange, showAirportLabels, onShowAirportLabelsChange, showRadar, onShowRadarChange, showSatellite, onShowSatelliteChange, autoMoveEnabled, onAutoMoveChange }: StatusBarProps) {
   return (
     <div style={{
       position: 'absolute',
@@ -168,6 +170,20 @@ export default function StatusBar({ lastUpdate, isRefreshing, windToggleEnabled,
               }}
             />
             <span style={{ color: '#cccccc' }}>Radar</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>
+            <input
+              type="checkbox"
+              checked={autoMoveEnabled}
+              onChange={(e) => onAutoMoveChange(e.target.checked)}
+              style={{
+                width: '16px',
+                height: '16px',
+                cursor: 'pointer',
+                accentColor: '#4CAF50'
+              }}
+            />
+            <span style={{ color: '#cccccc' }}>Auto Move</span>
           </label>
           {/* Satellite layer disabled - tiles not working properly */}
           {/* <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>
