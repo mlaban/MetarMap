@@ -11,19 +11,24 @@ interface MapProps {
   zoom: number;
   windToggleEnabled: boolean;
   showAirportLabels: boolean;
+  showRadar: boolean;
+  showSatellite: boolean;
   onRefreshAirport?: (icao: string) => Promise<void>;
 }
 
-export default function Map({ airportMETARs, center, zoom, windToggleEnabled, showAirportLabels, onRefreshAirport }: MapProps) {
+export default function Map({ airportMETARs, center, zoom, windToggleEnabled, showAirportLabels, showRadar, showSatellite, onRefreshAirport }: MapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.CircleMarker[]>([]);
   const coreMarkersRef = useRef<L.CircleMarker[]>([]);
+  const hitBoxMarkersRef = useRef<L.CircleMarker[]>([]);
   const labelsRef = useRef<L.Marker[]>([]);
   const tafArrowsRef = useRef<L.Marker[]>([]);
   const refreshingAirportsRef = useRef<Set<string>>(new Set());
   const previousCategoriesRef = useRef<globalThis.Map<string, FlightCategory>>(new globalThis.Map());
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showWinds, setShowWinds] = useState(false);
+  const radarLayerRef = useRef<L.TileLayer | null>(null);
+  const satelliteLayerRef = useRef<L.TileLayer | null>(null);
 
   // Helper function to generate a consistent delay based on ICAO code
   const getStaggerDelay = (icao: string): number => {
@@ -47,11 +52,17 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
       });
 
       // Add dark mode tile layer (CartoDB Dark Matter)
+      // Using 'dark_nolabels' or 'dark_all' - 'dark_nolabels' may show less water detail
+      // Alternative: Use Positron style for lighter rendering with less detail
+      // Options: 'dark_all', 'dark_nolabels', 'positron', 'positron_nolabels', 'voyager'
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: 'abcd',
         maxZoom: 19
       }).addTo(mapRef.current);
+      
+      // Note: Raster tiles are pre-rendered and cannot filter specific features like small water bodies.
+      // To hide small water bodies, you would need to use vector tiles with custom styling.
     }
 
     // Cleanup function
@@ -62,6 +73,55 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
       }
     };
   }, []);
+
+  // Initialize and update radar layer when visibility changes
+  useEffect(() => {
+    if (!mapRef.current) return;
+    
+    // Remove old layer if it exists
+    if (radarLayerRef.current) {
+      radarLayerRef.current.remove();
+    }
+
+    // Create composite radar layer (n0r - combines all tilts)
+    radarLayerRef.current = L.tileLayer('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0r-900913/{z}/{x}/{y}.png', {
+      attribution: 'NOAA NEXRAD via Iowa State Mesonet',
+      opacity: 0.6,
+      maxZoom: 10,
+      zIndex: 100
+    });
+
+    // Add to map if radar should be shown
+    if (showRadar) {
+      radarLayerRef.current.addTo(mapRef.current);
+    }
+  }, [showRadar]);
+
+  // Satellite layer disabled - tiles not working properly (showing all green)
+  // TODO: Re-enable when a working satellite tile service is found
+  // useEffect(() => {
+  //   if (!mapRef.current) return;
+  //   
+  //   // Remove old layer if it exists
+  //   if (satelliteLayerRef.current) {
+  //     satelliteLayerRef.current.remove();
+  //   }
+
+  //   // Create GOES-16 satellite geocolor layer (shows clouds and weather)
+  //   // Using Iowa State Mesonet GOES satellite tiles
+  //   satelliteLayerRef.current = L.tileLayer('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/goes-16-geocolor-900913/{z}/{x}/{y}.png', {
+  //     attribution: 'NOAA GOES-16 via Iowa State Mesonet',
+  //     opacity: 0.7,
+  //     maxZoom: 10,
+  //     zIndex: 90,
+  //     errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+  //   });
+
+  //   // Add to map if satellite should be shown
+  //   if (showSatellite) {
+  //     satelliteLayerRef.current.addTo(mapRef.current);
+  //   }
+  // }, [showSatellite]);
 
   useEffect(() => {
     console.log('[Map] airportMETARs changed, updating markers');
@@ -82,6 +142,9 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
     coreMarkersRef.current.forEach(marker => {
       mapRef.current?.removeLayer(marker);
     });
+    hitBoxMarkersRef.current.forEach(marker => {
+      mapRef.current?.removeLayer(marker);
+    });
     labelsRef.current.forEach(label => {
       mapRef.current?.removeLayer(label);
     });
@@ -90,6 +153,7 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
     });
     markersRef.current = [];
     coreMarkersRef.current = [];
+    hitBoxMarkersRef.current = [];
     labelsRef.current = [];
     tafArrowsRef.current = [];
 
@@ -99,18 +163,22 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
       console.log(`[Map] Adding marker for ${airport.icao} at [${airport.latitude}, ${airport.longitude}], category: ${flightCategory}`);
       const color = FlightCategoryColors[flightCategory] || FlightCategoryColors.UNKNOWN;
       
-      // VFR markers are 25% smaller, MVFR markers are 25% larger
+      // VFR markers are slightly larger, MVFR markers are 25% larger, UNKNOWN markers are half size
       const isVFR = flightCategory === FlightCategory.VFR;
       const isMVFR = flightCategory === FlightCategory.MVFR;
+      const isUnknown = flightCategory === FlightCategory.UNKNOWN;
       let outerRadius = 2;
       let coreRadius = 1;
       
       if (isVFR) {
-        outerRadius = 1.5; // 25% smaller
-        coreRadius = 0.75;
+        outerRadius = 1.7; // Slightly larger for VFR (green dots)
+        coreRadius = 1.0;
       } else if (isMVFR) {
         outerRadius = 2.5; // 25% larger
         coreRadius = 1.25;
+      } else if (isUnknown) {
+        outerRadius = 1; // Half size
+        coreRadius = 0.5;
       }
       
       // Create outer colored circle with glow
@@ -136,6 +204,21 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
           weight: 0,
           opacity: 1,
           fillOpacity: 1
+        }
+      );
+
+      // Create larger invisible hit box for easier clicking
+      const hitBoxMarker = L.circleMarker(
+        [airport.latitude, airport.longitude],
+        {
+          radius: 8, // Larger hit box (8px radius = 16px diameter)
+          fillColor: 'transparent',
+          color: 'transparent',
+          weight: 0,
+          opacity: 0,
+          fillOpacity: 0,
+          interactive: true,
+          bubblingMouseEvents: false
         }
       );
 
@@ -217,7 +300,6 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
       // Get TAF data
       const taf = airportMETARs.find(am => am.airport.icao === airport.icao)?.taf;
       const tafText = taf?.rawTAF || taf?.rawOb || taf?.rawText || 'No TAF available';
-      const isRefreshing = refreshingAirportsRef.current.has(airport.icao);
       
       // Determine trend (improving, worsening, or stable)
       const previousCategory = previousCategoriesRef.current.get(airport.icao);
@@ -246,7 +328,7 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
       previousCategoriesRef.current.set(airport.icao, flightCategory);
       
       // Function to create popup content
-      const createPopupContent = (airportData: AirportMETAR, isRefreshing: boolean, trend: 'improving' | 'worsening' | 'stable' | null, previousCategory?: FlightCategory) => {
+      const createPopupContent = (airportData: AirportMETAR, trend: 'improving' | 'worsening' | 'stable' | null, previousCategory?: FlightCategory) => {
         const metar = airportData.metar;
         const taf = airportData.taf;
         const category = airportData.flightCategory;
@@ -287,24 +369,8 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
         
         return `
           <div style="color: white; font-family: Arial, sans-serif; min-width: 200px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <div style="margin-bottom: 4px;">
               <strong style="font-size: 16px;">${airport.icao}</strong>
-              <button 
-                id="refresh-btn-${airport.icao}" 
-                style="
-                  background-color: #333;
-                  color: white;
-                  border: 1px solid #555;
-                  border-radius: 4px;
-                  padding: 4px 8px;
-                  cursor: ${isRefreshing ? 'wait' : 'pointer'};
-                  font-size: 12px;
-                  opacity: ${isRefreshing ? '0.6' : '1'};
-                "
-                ${isRefreshing ? 'disabled' : ''}
-              >
-                ${isRefreshing ? '⏳' : '🔄'} ${isRefreshing ? 'Refreshing...' : 'Refresh'}
-              </button>
             </div>
             <span style="font-size: 12px; color: #cccccc;">${airport.name}</span><br/>
             <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #444;">
@@ -327,127 +393,22 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
       
       const popupContent = createPopupContent(
         airportMETARs.find(am => am.airport.icao === airport.icao)!,
-        isRefreshing,
         trend,
         previousCategory || undefined
       );
       
-      const popup = marker.bindPopup(popupContent);
+      // Bind popup to hit box marker (larger clickable area)
+      const popup = hitBoxMarker.bindPopup(popupContent);
       
-      // Handle refresh button click
-      marker.on('popupopen', function() {
-        const refreshBtn = document.getElementById(`refresh-btn-${airport.icao}`);
-        if (refreshBtn) {
-          refreshBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            if (refreshingAirportsRef.current.has(airport.icao)) return;
-            
-            refreshingAirportsRef.current.add(airport.icao);
-            setRefreshTrigger(prev => prev + 1);
-            
-            try {
-              // Update popup to show refreshing state
-              const currentData = airportMETARs.find(am => am.airport.icao === airport.icao);
-              const currentTrend = currentData ? (() => {
-                const prevCat = previousCategoriesRef.current.get(airport.icao);
-                if (prevCat && prevCat !== currentData.flightCategory) {
-                  const categoryOrder = {
-                    [FlightCategory.LIFR]: 0,
-                    [FlightCategory.IFR]: 1,
-                    [FlightCategory.MVFR]: 2,
-                    [FlightCategory.VFR]: 3,
-                  };
-                  const prevOrder = categoryOrder[prevCat] ?? 2;
-                  const currOrder = categoryOrder[currentData.flightCategory] ?? 2;
-                  if (currOrder > prevOrder) return 'improving';
-                  if (currOrder < prevOrder) return 'worsening';
-                }
-                return prevCat ? 'stable' : null;
-              })() : null;
-              
-              const prevCatForRefresh = previousCategoriesRef.current.get(airport.icao);
-              const refreshingContent = currentData 
-                ? createPopupContent(currentData, true, currentTrend, prevCatForRefresh || undefined)
-                : '<div>Refreshing...</div>';
-              marker.setPopupContent(refreshingContent);
-              
-              const updatedData = await fetchSingleAirport(airport);
-              
-              // Calculate new trend
-              const prevCat = previousCategoriesRef.current.get(airport.icao);
-              let newTrend: 'improving' | 'worsening' | 'stable' | null = null;
-              if (prevCat && prevCat !== updatedData.flightCategory) {
-                const categoryOrder = {
-                  [FlightCategory.LIFR]: 0,
-                  [FlightCategory.IFR]: 1,
-                  [FlightCategory.MVFR]: 2,
-                  [FlightCategory.VFR]: 3,
-                };
-                const prevOrder = categoryOrder[prevCat] ?? 2;
-                const currOrder = categoryOrder[updatedData.flightCategory] ?? 2;
-                if (currOrder > prevOrder) newTrend = 'improving';
-                else if (currOrder < prevOrder) newTrend = 'worsening';
-              } else if (prevCat) {
-                newTrend = 'stable';
-              }
-              previousCategoriesRef.current.set(airport.icao, updatedData.flightCategory);
-              
-              // Update parent state if callback provided
-              if (onRefreshAirport) {
-                await onRefreshAirport(airport.icao);
-              }
-              
-              // Update popup content with new data
-              const updatedContent = createPopupContent(updatedData, false, newTrend, prevCat || undefined);
-              marker.setPopupContent(updatedContent);
-              
-              // Update marker color if category changed
-              const newCategory = updatedData.flightCategory;
-              const newColor = FlightCategoryColors[newCategory];
-              if (newCategory !== flightCategory) {
-                marker.setStyle({
-                  fillColor: newColor,
-                  color: newColor
-                });
-                // Also update core marker if needed
-                const coreMarker = coreMarkersRef.current.find((_, idx) => 
-                  markersRef.current[idx] === marker
-                );
-              }
-            } catch (error) {
-              console.error(`[Map] Error refreshing ${airport.icao}:`, error);
-              const currentData = airportMETARs.find(am => am.airport.icao === airport.icao);
-              const currentTrend = currentData ? (() => {
-                const prevCat = previousCategoriesRef.current.get(airport.icao);
-                if (prevCat && prevCat !== currentData.flightCategory) {
-                  const categoryOrder = {
-                    [FlightCategory.LIFR]: 0,
-                    [FlightCategory.IFR]: 1,
-                    [FlightCategory.MVFR]: 2,
-                    [FlightCategory.VFR]: 3,
-                  };
-                  const prevOrder = categoryOrder[prevCat] ?? 2;
-                  const currOrder = categoryOrder[currentData.flightCategory] ?? 2;
-                  if (currOrder > prevOrder) return 'improving';
-                  if (currOrder < prevOrder) return 'worsening';
-                }
-                return prevCat ? 'stable' : null;
-              })() : null;
-              const prevCatForError = previousCategoriesRef.current.get(airport.icao);
-              const errorContent = currentData 
-                ? createPopupContent(currentData, false, currentTrend, prevCatForError || undefined) + '<div style="color: red; margin-top: 8px; font-size: 11px;">Error refreshing data. Please try again.</div>'
-                : '<div style="color: white;">Error refreshing data</div>';
-              marker.setPopupContent(errorContent);
-            } finally {
-              refreshingAirportsRef.current.delete(airport.icao);
-              setRefreshTrigger(prev => prev + 1);
-            }
-          });
-        }
-      });
+      // Make visible markers non-interactive so clicks go to hit box
+      marker.options.interactive = false;
+      coreMarker.options.interactive = false;
 
+      // Add hit box first (behind visible markers) so it captures clicks
+      hitBoxMarker.addTo(mapRef.current!);
       marker.addTo(mapRef.current!);
       coreMarker.addTo(mapRef.current!);
+      hitBoxMarkersRef.current.push(hitBoxMarker);
       markersRef.current.push(marker);
       coreMarkersRef.current.push(coreMarker);
       
@@ -492,12 +453,21 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
       
       // Add airport name label - alternate between ICAO and winds with smooth transitions
       // Only create label if showAirportLabels is true
+      // Make VFR labels smaller and more subtle to declutter
       if (showAirportLabels) {
         const labelId = `airport-label-${airport.icao}`;
         const staggerDelay = getStaggerDelay(airport.icao);
         
         // Determine what to show: winds if showWinds is true, windToggleEnabled is true, and we have wind data, otherwise ICAO
         const shouldShowWinds = windToggleEnabled && showWinds && windConditionsText;
+        
+        // Make VFR labels smaller and more transparent to reduce clutter
+        const isVFR = flightCategory === FlightCategory.VFR;
+        const icaoFontSize = isVFR ? '7px' : '8px';
+        const icaoOpacity = isVFR ? '0.5' : '1';
+        const windFontSize = '7px';
+        const labelHeight = isVFR ? 10 : 12;
+        const labelHeightStr = `${labelHeight}px`;
         
         // Create both elements with smooth crossfade transitions
         // Always create wind element if windConditionsText exists, even if not showing initially
@@ -506,13 +476,13 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
             pointer-events: none;
             text-align: center;
             width: 100%;
-            height: 15px;
+            height: ${labelHeightStr};
             overflow: visible;
           ">
             <div class="airport-label-content" id="${labelId}-icao" style="
               font-family: Arial, sans-serif;
-              font-size: 10px;
-              font-weight: bold;
+              font-size: ${icaoFontSize};
+              font-weight: ${isVFR ? 'normal' : 'bold'};
               color: #888888;
               text-shadow: 
                 -1px -1px 0 #000,
@@ -523,7 +493,7 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
               line-height: 1;
               -webkit-font-smoothing: antialiased;
               -moz-osx-font-smoothing: grayscale;
-              opacity: ${shouldShowWinds ? 0 : 1};
+              opacity: ${shouldShowWinds ? 0 : icaoOpacity};
               transition: opacity 0.8s ease-in-out;
               transition-delay: ${staggerDelay}ms;
               position: absolute;
@@ -535,7 +505,7 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
             ">${airport.icao}</div>
             ${windConditionsText ? `<div class="airport-label-content" id="${labelId}-wind" style="
               font-family: Arial, sans-serif;
-              font-size: 8px;
+              font-size: ${windFontSize};
               font-weight: normal;
               color: ${windColor};
               text-shadow: 
@@ -564,12 +534,12 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
         const labelIcon = L.divIcon({
           className: 'airport-label',
           html: labelHtml,
-          iconSize: [50, 15],
-          iconAnchor: [25, 15], // Anchor at bottom center, so label appears above
+          iconSize: [40, labelHeight],
+          iconAnchor: [20, labelHeight], // Anchor at bottom center, so label appears above
         });
         
-        // Offset label slightly above the marker
-        const labelLat = airport.latitude + 0.008; // Small offset north
+        // Offset label closer to marker to reduce clutter
+        const labelLat = airport.latitude + 0.004; // Reduced offset (was 0.008)
         const labelMarker = L.marker([labelLat, airport.longitude], {
           icon: labelIcon,
           zIndexOffset: 500,

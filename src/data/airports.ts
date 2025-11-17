@@ -166,6 +166,7 @@ export const NY_AREA_AIRPORTS: Airport[] = [
   
   // Delaware
   { icao: 'KILG', name: 'Wilmington Airport', latitude: 39.6787, longitude: -75.6065 },
+  { icao: 'KGED', name: 'Sussex County Airport', latitude: 38.6892, longitude: -75.3589 },
   
   // Maryland
   { icao: 'KBWI', name: 'Baltimore/Washington International', latitude: 39.1774, longitude: -76.6684 },
@@ -176,11 +177,28 @@ export const NY_AREA_AIRPORTS: Airport[] = [
   { icao: 'KFDK', name: 'Frederick Municipal Airport', latitude: 39.4178, longitude: -77.3744 },
   { icao: 'KCGE', name: 'Cambridge-Dorchester Airport', latitude: 38.5392, longitude: -76.0303 },
   { icao: 'KDMW', name: 'Carroll County Regional Airport', latitude: 39.6083, longitude: -77.0078 },
+  { icao: 'KSBY', name: 'Salisbury-Ocean City Wicomico Regional', latitude: 38.3403, longitude: -75.5103 },
+  
+  // Washington DC area
+  { icao: 'KDCA', name: 'Ronald Reagan Washington National', latitude: 38.8512, longitude: -77.0402 },
+  { icao: 'KIAD', name: 'Washington Dulles International', latitude: 38.9445, longitude: -77.4558 },
+  
+  // West Virginia
+  { icao: 'KCRW', name: 'Yeager Airport', latitude: 38.3731, longitude: -81.5932 },
+  { icao: 'KCKB', name: 'North Central West Virginia Airport', latitude: 39.2967, longitude: -80.2281 },
+  { icao: 'KEKN', name: 'Elkins-Randolph County Regional', latitude: 38.8897, longitude: -79.8572 },
+  { icao: 'KHTS', name: 'Tri-State Airport', latitude: 38.3667, longitude: -82.5583 },
+  { icao: 'KPKB', name: 'Mid-Ohio Valley Regional', latitude: 39.3450, longitude: -81.4392 },
   
   // Canada - Toronto area
   { icao: 'CYYZ', name: 'Toronto Pearson International', latitude: 43.6772, longitude: -79.6306 },
   { icao: 'CYTZ', name: 'Billy Bishop Toronto City Airport', latitude: 43.6275, longitude: -79.3962 },
   { icao: 'CYKZ', name: 'Toronto/Buttonville Municipal', latitude: 43.8622, longitude: -79.3700 },
+  { icao: 'CYOO', name: 'Oshawa Executive Airport', latitude: 43.9228, longitude: -78.8950 },
+  { icao: 'CYHM', name: 'John C. Munro Hamilton International', latitude: 43.1736, longitude: -79.9350 },
+  { icao: 'CYKF', name: 'Region of Waterloo International', latitude: 43.4608, longitude: -80.3786 },
+  { icao: 'CYFD', name: 'Brantford Airport', latitude: 43.1314, longitude: -80.3425 },
+  { icao: 'CYSN', name: 'St. Catharines/Niagara District', latitude: 43.1917, longitude: -79.1717 },
   
   // Canada - Montreal area
   { icao: 'CYUL', name: 'Montréal-Pierre Elliott Trudeau International', latitude: 45.4577, longitude: -73.7497 },

@@ -7,6 +7,10 @@ interface StatusBarProps {
   onWindToggleChange: (enabled: boolean) => void;
   showAirportLabels: boolean;
   onShowAirportLabelsChange: (show: boolean) => void;
+  showRadar: boolean;
+  onShowRadarChange: (show: boolean) => void;
+  showSatellite: boolean;
+  onShowSatelliteChange: (show: boolean) => void;
 }
 
 const LegendDot = ({ color, label }: { color: string; label: string }) => {
@@ -78,7 +82,7 @@ const BlinkingLegendDot = ({ color, label }: { color: string; label: string }) =
   );
 };
 
-export default function StatusBar({ lastUpdate, isRefreshing, windToggleEnabled, onWindToggleChange, showAirportLabels, onShowAirportLabelsChange }: StatusBarProps) {
+export default function StatusBar({ lastUpdate, isRefreshing, windToggleEnabled, onWindToggleChange, showAirportLabels, onShowAirportLabelsChange, showRadar, onShowRadarChange, showSatellite, onShowSatelliteChange }: StatusBarProps) {
   return (
     <div style={{
       position: 'absolute',
@@ -151,6 +155,35 @@ export default function StatusBar({ lastUpdate, isRefreshing, windToggleEnabled,
             />
             <span style={{ color: '#cccccc' }}>Show Labels</span>
           </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>
+            <input
+              type="checkbox"
+              checked={showRadar}
+              onChange={(e) => onShowRadarChange(e.target.checked)}
+              style={{
+                width: '16px',
+                height: '16px',
+                cursor: 'pointer',
+                accentColor: '#4CAF50'
+              }}
+            />
+            <span style={{ color: '#cccccc' }}>Radar</span>
+          </label>
+          {/* Satellite layer disabled - tiles not working properly */}
+          {/* <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>
+            <input
+              type="checkbox"
+              checked={showSatellite}
+              onChange={(e) => onShowSatelliteChange(e.target.checked)}
+              style={{
+                width: '16px',
+                height: '16px',
+                cursor: 'pointer',
+                accentColor: '#4CAF50'
+              }}
+            />
+            <span style={{ color: '#cccccc' }}>Satellite</span>
+          </label> */}
         </div>
       </div>
     </div>
