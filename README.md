@@ -118,7 +118,7 @@ src/
 
 ## A Note on Development
 
-This project has been entirely vibe coded. What does that mean? It means I built it iteratively, following intuition and making it work the way I wanted it to work, rather than following a strict plan. The code reflects that - it's functional, it works well, and it's been refined through use. If you find something that could be improved, feel free to make it better!
+This project has been built with Cursor / Composer 1 with guidance. The development process was iterative and intuitive, building features as needed and refining through use. The code reflects that approach - it's functional, it works well, and it's been refined through use. If you find something that could be improved, feel free to make it better!
 
 ## API
 
