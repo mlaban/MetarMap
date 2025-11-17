@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { AirportMETAR, fetchSingleAirport } from '../services/metarService';
 import { FlightCategoryColors, FlightCategory } from '../types/flightCategory';
 import { getNextTAFCondition } from '../utils/tafParser';
@@ -10,6 +10,7 @@ interface AirportOverlayProps {
 }
 
 const STORAGE_KEY = 'favoriteAirportIcao';
+const POSITION_STORAGE_KEY = 'airportOverlayPosition';
 
 export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOverlayProps) {
   const [favoriteIcao, setFavoriteIcao] = useState<string>(() => {
@@ -21,6 +22,32 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
   const [airportData, setAirportData] = useState<AirportMETAR | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Position state for dragging
+  const [position, setPosition] = useState<{ top: number; left: number }>(() => {
+    // Load position from localStorage or use default
+    const saved = localStorage.getItem(POSITION_STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return { top: parsed.top || 80, left: parsed.left || window.innerWidth - 420 };
+      } catch {
+        // Fallback to default if parse fails
+      }
+    }
+    // Default position: bottom right (converted to top/left)
+    return { top: window.innerHeight - 400, left: window.innerWidth - 420 };
+  });
+  
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const positionRef = useRef(position);
+  
+  // Keep positionRef in sync with position state
+  useEffect(() => {
+    positionRef.current = position;
+  }, [position]);
 
   // Load airport data when favoriteIcao changes
   useEffect(() => {
@@ -93,15 +120,129 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
     setInputIcao('');
   };
 
+  // Drag handlers
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Don't start dragging if clicking on interactive elements
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.closest('button') || target.closest('input')) {
+      return;
+    }
+    
+    if (overlayRef.current) {
+      const rect = overlayRef.current.getBoundingClientRect();
+      setDragOffset({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      });
+      setIsDragging(true);
+    }
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging && overlayRef.current) {
+        const newLeft = e.clientX - dragOffset.x;
+        const newTop = e.clientY - dragOffset.y;
+        
+        // Constrain to viewport bounds
+        const maxLeft = window.innerWidth - overlayRef.current.offsetWidth;
+        const maxTop = window.innerHeight - overlayRef.current.offsetHeight;
+        
+        const constrainedPosition = {
+          left: Math.max(0, Math.min(newLeft, maxLeft)),
+          top: Math.max(0, Math.min(newTop, maxTop))
+        };
+        
+        setPosition(constrainedPosition);
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (isDragging) {
+        setIsDragging(false);
+        // Save position to localStorage
+        localStorage.setItem(POSITION_STORAGE_KEY, JSON.stringify(positionRef.current));
+      }
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, dragOffset]);
+
+  // Validate and constrain position on mount and when window resizes
+  useEffect(() => {
+    const validatePosition = () => {
+      if (overlayRef.current) {
+        const maxLeft = window.innerWidth - overlayRef.current.offsetWidth;
+        const maxTop = window.innerHeight - overlayRef.current.offsetHeight;
+        setPosition(prev => {
+          const constrained = {
+            left: Math.max(0, Math.min(prev.left, maxLeft)),
+            top: Math.max(0, Math.min(prev.top, maxTop))
+          };
+          // Save constrained position if it changed
+          if (constrained.left !== prev.left || constrained.top !== prev.top) {
+            localStorage.setItem(POSITION_STORAGE_KEY, JSON.stringify(constrained));
+          }
+          return constrained;
+        });
+      }
+    };
+
+    // Validate on mount (after first render)
+    const timeoutId = setTimeout(validatePosition, 0);
+    
+    // Validate on resize
+    window.addEventListener('resize', validatePosition);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', validatePosition);
+    };
+  }, []);
+
+  // Helper function to determine if it's windy and get wind conditions text
+  const getWindConditions = () => {
+    if (!airportData?.metar) return null;
+    
+    const windSpeed = airportData.metar.wspd || airportData.metar.windSpeedKt || 0;
+    const windDir = airportData.metar.wdir || airportData.metar.windDirDegrees;
+    const windGust = airportData.metar.wgst || (airportData.metar as any)?.windGustKt || 0;
+    const maxWind = Math.max(windSpeed, windGust);
+    
+    // Consider it windy if wind speed (including gusts) is >= 15 knots
+    if (maxWind >= 15) {
+      let windText = '';
+      if (windGust > 0 && windGust >= 15) {
+        windText = `${Math.round(windSpeed)}G${Math.round(windGust)}KT`;
+      } else if (windDir !== undefined && windDir !== null) {
+        windText = `${Math.round(windDir)}°@${Math.round(windSpeed)}KT`;
+      } else {
+        windText = `${Math.round(windSpeed)}KT`;
+      }
+      return windText;
+    }
+    return null;
+  };
+
 
   // Show input form if no airport is set or if editing
   if (!favoriteIcao || editingIcao) {
     return (
       <div
+        ref={overlayRef}
+        onMouseDown={handleMouseDown}
         style={{
-          position: 'absolute',
-          bottom: '80px',
-          right: '20px',
+          position: 'fixed',
+          top: `${position.top}px`,
+          left: `${position.left}px`,
           backgroundColor: 'rgba(26, 26, 26, 0.9)',
           border: '1px solid #444',
           borderRadius: '8px',
@@ -111,7 +252,9 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
           color: '#ffffff',
           fontFamily: 'Arial, sans-serif',
           zIndex: 1000,
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)'
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+          cursor: isDragging ? 'grabbing' : 'grab',
+          userSelect: 'none'
         }}
       >
         <div style={{ marginBottom: '12px' }}>
@@ -188,10 +331,12 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
   if (isLoading) {
     return (
       <div
+        ref={overlayRef}
+        onMouseDown={handleMouseDown}
         style={{
-          position: 'absolute',
-          bottom: '80px',
-          right: '20px',
+          position: 'fixed',
+          top: `${position.top}px`,
+          left: `${position.left}px`,
           backgroundColor: 'rgba(26, 26, 26, 0.9)',
           border: '1px solid #444',
           borderRadius: '8px',
@@ -201,7 +346,9 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
           color: '#ffffff',
           fontFamily: 'Arial, sans-serif',
           zIndex: 1000,
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)'
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+          cursor: isDragging ? 'grabbing' : 'grab',
+          userSelect: 'none'
         }}
       >
         <div style={{ textAlign: 'center', padding: '20px' }}>
@@ -215,10 +362,12 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
   if (error && !airportData) {
     return (
       <div
+        ref={overlayRef}
+        onMouseDown={handleMouseDown}
         style={{
-          position: 'absolute',
-          bottom: '80px',
-          right: '20px',
+          position: 'fixed',
+          top: `${position.top}px`,
+          left: `${position.left}px`,
           backgroundColor: 'rgba(26, 26, 26, 0.9)',
           border: '1px solid #444',
           borderRadius: '8px',
@@ -228,7 +377,9 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
           color: '#ffffff',
           fontFamily: 'Arial, sans-serif',
           zIndex: 1000,
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)'
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+          cursor: isDragging ? 'grabbing' : 'grab',
+          userSelect: 'none'
         }}
       >
         <div style={{ marginBottom: '12px' }}>
@@ -295,13 +446,30 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
 
   const metarText = airportData.metar?.rawOb || airportData.metar?.rawText || 'No METAR available';
   const tafText = airportData.taf?.rawTAF || airportData.taf?.rawOb || airportData.taf?.rawText || 'No TAF available';
+  const windConditions = getWindConditions();
+
+  // Get wind color based on wind speed
+  const getWindColor = () => {
+    if (!airportData?.metar) return '#888888';
+    const windSpeed = airportData.metar.wspd || airportData.metar.windSpeedKt || 0;
+    const windGust = airportData.metar.wgst || (airportData.metar as any)?.windGustKt || 0;
+    const maxWind = Math.max(windSpeed, windGust);
+    
+    if (maxWind > 40) return '#FF00FF'; // Magenta
+    if (maxWind > 30) return '#FF0000'; // Red
+    if (maxWind > 20) return '#FF8000'; // Orange
+    if (maxWind > 15) return '#0080FF'; // Blue
+    return '#00FF00'; // Green
+  };
 
   return (
     <div
+      ref={overlayRef}
+      onMouseDown={handleMouseDown}
       style={{
-        position: 'absolute',
-        bottom: '80px',
-        right: '20px',
+        position: 'fixed',
+        top: `${position.top}px`,
+        left: `${position.left}px`,
         backgroundColor: 'rgba(26, 26, 26, 0.9)',
         border: '1px solid #444',
         borderRadius: '8px',
@@ -311,7 +479,9 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
         color: '#ffffff',
         fontFamily: 'Arial, sans-serif',
         zIndex: 1000,
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)'
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+        cursor: isDragging ? 'grabbing' : 'grab',
+        userSelect: 'none'
       }}
     >
       <div style={{ marginBottom: '12px' }}>
@@ -383,6 +553,17 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
             />
           </div>
           <div style={{ fontSize: '14px', color: metarColor, fontWeight: 'bold' }}>{metarCategory}</div>
+          {windConditions && (
+            <div style={{ 
+              fontSize: '12px', 
+              color: getWindColor(), 
+              fontWeight: 'normal',
+              marginLeft: '8px',
+              textShadow: `0 0 2px ${getWindColor()}, 0 0 4px ${getWindColor()}`
+            }}>
+              {windConditions}
+            </div>
+          )}
         </div>
 
         {tafCategory && (
