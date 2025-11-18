@@ -1,7 +1,7 @@
 import { Airport } from '../types/airport';
 
 // Major airports in the Northeast United States and Toronto area
-export const NY_AREA_AIRPORTS: Airport[] = [
+export const AIRPORTS: Airport[] = [
   // New York
   { icao: 'KJFK', name: 'John F. Kennedy International', latitude: 40.6398, longitude: -73.7789 },
   { icao: 'KLGA', name: 'LaGuardia Airport', latitude: 40.7769, longitude: -73.8740 },
@@ -223,4 +223,88 @@ export const NY_AREA_AIRPORTS: Airport[] = [
   { icao: 'CYUY', name: 'Rouyn-Noranda Airport', latitude: 48.2061, longitude: -78.8356 },
   { icao: 'CYVO', name: 'Val-d\'Or Airport', latitude: 48.0533, longitude: -77.7828 },
   { icao: 'CYMT', name: 'Chibougamau/Chapais Airport', latitude: 49.7719, longitude: -74.5281 },
+  
+  // --- Global Airports ---
+
+  // North America (West/Central/South)
+  { icao: 'KLAX', name: 'Los Angeles International', latitude: 33.9416, longitude: -118.4085 },
+  { icao: 'KSFO', name: 'San Francisco International', latitude: 37.6188, longitude: -122.3754 },
+  { icao: 'KSEA', name: 'Seattle-Tacoma International', latitude: 47.4502, longitude: -122.3117 },
+  { icao: 'KDEN', name: 'Denver International', latitude: 39.8561, longitude: -104.6737 },
+  { icao: 'KORD', name: 'O\'Hare International', latitude: 41.9742, longitude: -87.9073 },
+  { icao: 'KATL', name: 'Hartsfield-Jackson Atlanta', latitude: 33.6407, longitude: -84.4277 },
+  { icao: 'KMIA', name: 'Miami International', latitude: 25.7959, longitude: -80.2871 },
+  { icao: 'KDFW', name: 'Dallas/Fort Worth International', latitude: 32.8998, longitude: -97.0403 },
+  { icao: 'KIAH', name: 'George Bush Intercontinental', latitude: 29.9805, longitude: -95.3397 },
+  { icao: 'KLAS', name: 'Harry Reid International', latitude: 36.0840, longitude: -115.1537 },
+  { icao: 'KPHX', name: 'Phoenix Sky Harbor', latitude: 33.4343, longitude: -112.0116 },
+  { icao: 'CYVR', name: 'Vancouver International', latitude: 49.1947, longitude: -123.1792 },
+  { icao: 'CYYC', name: 'Calgary International', latitude: 51.1215, longitude: -114.0076 },
+  { icao: 'MMMX', name: 'Mexico City International', latitude: 19.4363, longitude: -99.0721 },
+
+  // South America
+  { icao: 'SBGR', name: 'São Paulo/Guarulhos', latitude: -23.4356, longitude: -46.4731 },
+  { icao: 'SBGL', name: 'Rio de Janeiro/Galeão', latitude: -22.8134, longitude: -43.2494 },
+  { icao: 'SCEL', name: 'Arturo Merino Benítez (Santiago)', latitude: -33.3930, longitude: -70.7858 },
+  { icao: 'SAEZ', name: 'Ezeiza International (Buenos Aires)', latitude: -34.8150, longitude: -58.5348 },
+  { icao: 'SKBO', name: 'El Dorado International (Bogota)', latitude: 4.7016, longitude: -74.1469 },
+  { icao: 'SPJC', name: 'Jorge Chávez International (Lima)', latitude: -12.0219, longitude: -77.1143 },
+
+  // Europe
+  { icao: 'EGLL', name: 'Heathrow Airport', latitude: 51.4700, longitude: -0.4543 },
+  { icao: 'EGKK', name: 'Gatwick Airport', latitude: 51.1537, longitude: -0.1821 },
+  { icao: 'LFPG', name: 'Charles de Gaulle', latitude: 49.0097, longitude: 2.5479 },
+  { icao: 'LFPO', name: 'Orly Airport', latitude: 48.7262, longitude: 2.3652 },
+  { icao: 'EDDF', name: 'Frankfurt Airport', latitude: 50.0379, longitude: 8.5622 },
+  { icao: 'EDDM', name: 'Munich Airport', latitude: 48.3537, longitude: 11.7750 },
+  { icao: 'EHAM', name: 'Amsterdam Airport Schiphol', latitude: 52.3105, longitude: 4.7683 },
+  { icao: 'LEMD', name: 'Adolfo Suárez Madrid–Barajas', latitude: 40.4839, longitude: -3.5679 },
+  { icao: 'LEBL', name: 'Josep Tarradellas Barcelona-El Prat', latitude: 41.2974, longitude: 2.0833 },
+  { icao: 'LIRF', name: 'Leonardo da Vinci–Fiumicino', latitude: 41.8003, longitude: 12.2389 },
+  { icao: 'LIMC', name: 'Malpensa Airport', latitude: 45.6301, longitude: 8.7255 },
+  { icao: 'LSZH', name: 'Zurich Airport', latitude: 47.4582, longitude: 8.5555 },
+  { icao: 'EKCH', name: 'Copenhagen Airport', latitude: 55.6180, longitude: 12.6508 },
+  { icao: 'ESSA', name: 'Stockholm Arlanda', latitude: 59.6498, longitude: 17.9238 },
+  { icao: 'EFHK', name: 'Helsinki Airport', latitude: 60.3210, longitude: 24.9529 },
+  { icao: 'ENGM', name: 'Oslo Airport', latitude: 60.1976, longitude: 11.1004 },
+  { icao: 'LOWW', name: 'Vienna International', latitude: 48.1103, longitude: 16.5697 },
+  { icao: 'EBBR', name: 'Brussels Airport', latitude: 50.9014, longitude: 4.4844 },
+  { icao: 'EIDW', name: 'Dublin Airport', latitude: 53.4264, longitude: -6.2499 },
+  { icao: 'LPPT', name: 'Humberto Delgado (Lisbon)', latitude: 38.7742, longitude: -9.1342 },
+  { icao: 'LGAV', name: 'Athens International', latitude: 37.9364, longitude: 23.9445 },
+  { icao: 'LTFM', name: 'Istanbul Airport', latitude: 41.2753, longitude: 28.7519 },
+  { icao: 'UUEE', name: 'Sheremetyevo International', latitude: 55.9726, longitude: 37.4146 },
+
+  // Middle East
+  { icao: 'OMDB', name: 'Dubai International', latitude: 25.2532, longitude: 55.3657 },
+  { icao: 'OMAA', name: 'Zayed International (Abu Dhabi)', latitude: 24.4441, longitude: 54.6511 },
+  { icao: 'OTHH', name: 'Hamad International (Doha)', latitude: 25.2731, longitude: 51.6081 },
+  { icao: 'LLBG', name: 'Ben Gurion', latitude: 32.0055, longitude: 34.8854 },
+
+  // Asia
+  { icao: 'RJTT', name: 'Tokyo Haneda', latitude: 35.5494, longitude: 139.7798 },
+  { icao: 'RJAA', name: 'Narita International', latitude: 35.7720, longitude: 140.3929 },
+  { icao: 'RKSI', name: 'Incheon International', latitude: 37.4602, longitude: 126.4407 },
+  { icao: 'VHHH', name: 'Hong Kong International', latitude: 22.3080, longitude: 113.9185 },
+  { icao: 'WSSS', name: 'Singapore Changi', latitude: 1.3644, longitude: 103.9915 },
+  { icao: 'VTBS', name: 'Suvarnabhumi (Bangkok)', latitude: 13.6900, longitude: 100.7501 },
+  { icao: 'WMKK', name: 'Kuala Lumpur International', latitude: 2.7456, longitude: 101.7072 },
+  { icao: 'RPLL', name: 'Ninoy Aquino (Manila)', latitude: 14.5086, longitude: 121.0194 },
+  { icao: 'VABB', name: 'Chhatrapati Shivaji Maharaj (Mumbai)', latitude: 19.0896, longitude: 72.8656 },
+  { icao: 'VIDP', name: 'Indira Gandhi (Delhi)', latitude: 28.5562, longitude: 77.1000 },
+  { icao: 'ZBAA', name: 'Beijing Capital', latitude: 40.0799, longitude: 116.6031 },
+  { icao: 'ZSPD', name: 'Shanghai Pudong', latitude: 31.1443, longitude: 121.8083 },
+
+  // Oceania
+  { icao: 'YSSY', name: 'Sydney Kingsford Smith', latitude: -33.9399, longitude: 151.1753 },
+  { icao: 'YMML', name: 'Melbourne Airport', latitude: -37.6690, longitude: 144.8410 },
+  { icao: 'YBBN', name: 'Brisbane Airport', latitude: -27.3842, longitude: 153.1175 },
+  { icao: 'NZAA', name: 'Auckland Airport', latitude: -37.0082, longitude: 174.7850 },
+
+  // Africa
+  { icao: 'FAOR', name: 'O.R. Tambo (Johannesburg)', latitude: -26.1367, longitude: 28.2411 },
+  { icao: 'FACT', name: 'Cape Town International', latitude: -33.9715, longitude: 18.6021 },
+  { icao: 'HECA', name: 'Cairo International', latitude: 30.1103, longitude: 31.4065 },
+  { icao: 'HKJK', name: 'Jomo Kenyatta (Nairobi)', latitude: -1.3192, longitude: 36.9275 },
+  { icao: 'DNMM', name: 'Murtala Muhammed (Lagos)', latitude: 6.5774, longitude: 3.3215 },
 ];

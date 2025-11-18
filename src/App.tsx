@@ -6,7 +6,7 @@ import AirportOverlay from './components/AirportOverlay';
 import { fetchMETARs } from './services/metarService';
 import { AirportMETAR } from './services/metarService';
 import { FlightCategory } from './types/flightCategory';
-import { NY_AREA_AIRPORTS } from './data/airports';
+import { AIRPORTS } from './data/airports';
 
 // Northeast region coordinates (centered on the region)
 const NY_CENTER: [number, number] = [41.5, -73.0];
@@ -31,7 +31,7 @@ function App() {
     // Check if refresh is allowed (only if forced or enough time has passed)
     const now = Date.now();
     const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
-    
+
     if (isRefresh && !forceRefresh && timeSinceLastRefresh < REFRESH_INTERVAL_MS) {
       const remainingSeconds = Math.ceil((REFRESH_INTERVAL_MS - timeSinceLastRefresh) / 1000);
       console.log(`[App] Refresh rate limited. Please wait ${remainingSeconds} more seconds.`);
@@ -39,9 +39,9 @@ function App() {
     }
 
     console.log('[App] loadWeatherData called, isRefresh:', isRefresh, 'forceRefresh:', forceRefresh);
-    console.log('[App] Number of airports to fetch:', NY_AREA_AIRPORTS.length);
-    console.log('[App] Airport list:', NY_AREA_AIRPORTS.map(a => a.icao));
-    
+    console.log('[App] Number of airports to fetch:', AIRPORTS.length);
+    console.log('[App] Airport list:', AIRPORTS.map(a => a.icao));
+
     if (isRefresh) {
       setIsRefreshing(true);
       console.log('[App] Setting isRefreshing to true');
@@ -53,12 +53,12 @@ function App() {
 
     try {
       console.log('[App] Calling fetchMETARs...');
-      const data = await fetchMETARs(NY_AREA_AIRPORTS);
+      const data = await fetchMETARs(AIRPORTS);
       console.log('[App] Received data from fetchMETARs:', data);
       console.log('[App] Data length:', data.length);
       console.log('[App] Data with METARs:', data.filter(d => d.metar !== null).length);
       console.log('[App] Data with TAFs:', data.filter(d => d.taf !== null).length);
-      
+
       setAirportMETARs(data);
       setLastUpdate(new Date());
       lastRefreshTimeRef.current = now;
@@ -134,9 +134,9 @@ function App() {
           Error: {error}
         </div>
       )}
-      <Map 
-        airportMETARs={airportMETARs} 
-        center={NY_CENTER} 
+      <Map
+        airportMETARs={airportMETARs}
+        center={NY_CENTER}
         zoom={NY_ZOOM}
         windToggleEnabled={windToggleEnabled}
         showAirportLabels={showAirportLabels}
@@ -147,26 +147,26 @@ function App() {
           // Check rate limit before allowing individual airport refresh
           const now = Date.now();
           const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
-          
+
           if (timeSinceLastRefresh < REFRESH_INTERVAL_MS) {
             const remainingSeconds = Math.ceil((REFRESH_INTERVAL_MS - timeSinceLastRefresh) / 1000);
             console.log(`[App] Individual airport refresh rate limited. Please wait ${remainingSeconds} more seconds.`);
             return;
           }
 
-          const airport = NY_AREA_AIRPORTS.find(a => a.icao === icao);
+          const airport = AIRPORTS.find(a => a.icao === icao);
           if (airport) {
             const { fetchSingleAirport } = await import('./services/metarService');
             const updatedData = await fetchSingleAirport(airport);
-            setAirportMETARs(prev => prev.map(am => 
+            setAirportMETARs(prev => prev.map(am =>
               am.airport.icao === icao ? updatedData : am
             ));
             lastRefreshTimeRef.current = now;
           }
         }}
       />
-      <StatusBar 
-        lastUpdate={lastUpdate} 
+      <StatusBar
+        lastUpdate={lastUpdate}
         isRefreshing={isRefreshing}
         windToggleEnabled={windToggleEnabled}
         onWindToggleChange={setWindToggleEnabled}
@@ -179,7 +179,7 @@ function App() {
         autoMoveEnabled={autoMoveEnabled}
         onAutoMoveChange={setAutoMoveEnabled}
       />
-      <AirportOverlay 
+      <AirportOverlay
         airportMETARs={airportMETARs}
         onRefresh={async () => {
           await loadWeatherData(true, false); // Respect rate limit
