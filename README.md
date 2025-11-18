@@ -1,5 +1,8 @@
 # Weather Dashboard - METAR Map
 
+<img width="2024" height="1236" alt="Screenshot 2025-11-17 000042" src="https://github.com/user-attachments/assets/85ae3b80-8183-43dd-b904-be7316ddeb95" />
+
+
 A full-screen web application that displays airport weather conditions on a dark mode map, inspired by those physical METAR maps with Arduino that have popped up online.
 
 ## Inspiration
