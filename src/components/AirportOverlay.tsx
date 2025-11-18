@@ -1,8 +1,10 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { AirportMETAR, fetchSingleAirport } from '../services/metarService';
 import { FlightCategoryColors, FlightCategory } from '../types/flightCategory';
 import { getNextTAFCondition } from '../utils/tafParser';
 import { Airport } from '../types/airport';
+import { fetchWeatherForecast, getWeatherIcon, getWeatherDescription } from '../services/weatherService';
+import { WeatherForecast } from '../types/weatherForecast';
 
 interface AirportOverlayProps {
   airportMETARs: AirportMETAR[];
@@ -11,6 +13,7 @@ interface AirportOverlayProps {
 
 const STORAGE_KEY = 'favoriteAirportIcao';
 const POSITION_STORAGE_KEY = 'airportOverlayPosition';
+const TEMP_UNIT_STORAGE_KEY = 'temperatureUnit';
 
 export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOverlayProps) {
   const [favoriteIcao, setFavoriteIcao] = useState<string>(() => {
@@ -22,6 +25,12 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
   const [airportData, setAirportData] = useState<AirportMETAR | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [weatherForecast, setWeatherForecast] = useState<WeatherForecast[] | null>(null);
+  const [isLoadingForecast, setIsLoadingForecast] = useState(false);
+  const [temperatureUnit, setTemperatureUnit] = useState<'C' | 'F'>(() => {
+    // Load from localStorage on mount, default to F
+    return (localStorage.getItem(TEMP_UNIT_STORAGE_KEY) as 'C' | 'F') || 'F';
+  });
   
   // Position state for dragging
   const [position, setPosition] = useState<{ top: number; left: number }>(() => {
@@ -30,13 +39,13 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        return { top: parsed.top || 80, left: parsed.left || window.innerWidth - 420 };
+        return { top: parsed.top || 80, left: parsed.left || window.innerWidth - 500 };
       } catch {
         // Fallback to default if parse fails
       }
     }
     // Default position: bottom right (converted to top/left)
-    return { top: window.innerHeight - 400, left: window.innerWidth - 420 };
+    return { top: window.innerHeight - 400, left: window.innerWidth - 500 };
   });
   
   const [isDragging, setIsDragging] = useState(false);
@@ -49,10 +58,27 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
     positionRef.current = position;
   }, [position]);
 
+  // Load weather forecast
+  const loadForecast = useCallback(async (latitude: number, longitude: number) => {
+    if (!latitude || !longitude) return;
+    
+    setIsLoadingForecast(true);
+    try {
+      const forecast = await fetchWeatherForecast(latitude, longitude, temperatureUnit);
+      setWeatherForecast(forecast.forecasts);
+    } catch (err) {
+      console.error('[Airport Overlay] Error fetching forecast:', err);
+      setWeatherForecast(null);
+    } finally {
+      setIsLoadingForecast(false);
+    }
+  }, [temperatureUnit]);
+
   // Load airport data when favoriteIcao changes
   useEffect(() => {
     if (!favoriteIcao) {
       setAirportData(null);
+      setWeatherForecast(null);
       return;
     }
 
@@ -61,6 +87,8 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
     if (existingData) {
       setAirportData(existingData);
       setError(null);
+      // Load forecast for this airport
+      loadForecast(existingData.airport.latitude, existingData.airport.longitude);
       return;
     }
 
@@ -78,6 +106,10 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
       .then(data => {
         setAirportData(data);
         setError(null);
+        // Load forecast for this airport
+        if (data.airport.latitude && data.airport.longitude) {
+          loadForecast(data.airport.latitude, data.airport.longitude);
+        }
       })
       .catch(err => {
         console.error('[Airport Overlay] Error fetching airport:', err);
@@ -87,7 +119,7 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
       .finally(() => {
         setIsLoading(false);
       });
-  }, [favoriteIcao, airportMETARs]);
+  }, [favoriteIcao, airportMETARs, loadForecast]);
 
   // Update airport data when airportMETARs changes (in case the favorite airport is in the list)
   useEffect(() => {
@@ -96,9 +128,13 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
       if (existingData) {
         setAirportData(existingData);
         setError(null);
+        // Load forecast if not already loaded
+        if (!weatherForecast && existingData.airport.latitude && existingData.airport.longitude) {
+          loadForecast(existingData.airport.latitude, existingData.airport.longitude);
+        }
       }
     }
-  }, [airportMETARs, favoriteIcao]);
+  }, [airportMETARs, favoriteIcao, weatherForecast, loadForecast]);
 
   const handleSetIcao = () => {
     const icao = inputIcao.trim().toUpperCase();
@@ -232,6 +268,56 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
     return null;
   };
 
+  // Format date for display
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today';
+    } else if (date.toDateString() === tomorrow.toDateString()) {
+      return 'Tomorrow';
+    } else {
+      return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    }
+  };
+
+  // Format date for square items (shorter format)
+  const formatDateShort = (dateString: string): string => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today';
+    } else if (date.toDateString() === tomorrow.toDateString()) {
+      return 'Tmrw';
+    } else {
+      return date.toLocaleDateString('en-US', { weekday: 'short' });
+    }
+  };
+
+  // Convert km/h to knots
+  const kmhToKnots = (kmh: number): number => {
+    return Math.round(kmh * 0.539957);
+  };
+
+  // Format wind for display
+  const formatWind = (windSpeedKmh: number, windGustKmh: number, windDirection: number): string => {
+    if (windSpeedKmh === 0) return 'CALM';
+    const knots = kmhToKnots(windSpeedKmh);
+    const gustKnots = windGustKmh > 0 ? kmhToKnots(windGustKmh) : 0;
+    
+    // Only show gusts if they're >= 10 knots and exceed base wind speed
+    if (gustKnots >= 10 && gustKnots > knots) {
+      return `${knots}G${gustKnots}KT`;
+    }
+    return `${knots}KT`;
+  };
+
 
   // Show input form if no airport is set or if editing
   if (!favoriteIcao || editingIcao) {
@@ -247,8 +333,8 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
           border: '1px solid #444',
           borderRadius: '8px',
           padding: '16px',
+          width: 'fit-content',
           minWidth: '300px',
-          maxWidth: '400px',
           color: '#ffffff',
           fontFamily: 'Arial, sans-serif',
           zIndex: 1000,
@@ -341,8 +427,8 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
           border: '1px solid #444',
           borderRadius: '8px',
           padding: '16px',
+          width: 'fit-content',
           minWidth: '300px',
-          maxWidth: '400px',
           color: '#ffffff',
           fontFamily: 'Arial, sans-serif',
           zIndex: 1000,
@@ -372,8 +458,8 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
           border: '1px solid #444',
           borderRadius: '8px',
           padding: '16px',
+          width: 'fit-content',
           minWidth: '300px',
-          maxWidth: '400px',
           color: '#ffffff',
           fontFamily: 'Arial, sans-serif',
           zIndex: 1000,
@@ -474,8 +560,8 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
         border: '1px solid #444',
         borderRadius: '8px',
         padding: '16px',
+        width: weatherForecast && weatherForecast.length > 0 ? '593px' : 'fit-content',
         minWidth: '300px',
-        maxWidth: '400px',
         color: '#ffffff',
         fontFamily: 'Arial, sans-serif',
         zIndex: 1000,
@@ -485,22 +571,53 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
       }}
     >
       <div style={{ marginBottom: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <strong style={{ fontSize: '20px' }}>{favoriteIcao}</strong>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <strong style={{ fontSize: '20px' }}>{favoriteIcao}</strong>
+            <button
+              onClick={handleChangeIcao}
+              style={{
+                backgroundColor: 'transparent',
+                color: '#888',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '14px',
+                padding: '2px 6px',
+                borderRadius: '3px'
+              }}
+              title="Change airport"
+            >
+              ✏️
+            </button>
+          </div>
           <button
-            onClick={handleChangeIcao}
-            style={{
-              backgroundColor: 'transparent',
-              color: '#888',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '14px',
-              padding: '2px 6px',
-              borderRadius: '3px'
+            onClick={() => {
+              const newUnit = temperatureUnit === 'F' ? 'C' : 'F';
+              setTemperatureUnit(newUnit);
+              localStorage.setItem(TEMP_UNIT_STORAGE_KEY, newUnit);
+              // Reload forecast with new unit if we have airport data
+              if (airportData && airportData.airport.latitude && airportData.airport.longitude) {
+                loadForecast(airportData.airport.latitude, airportData.airport.longitude);
+              }
             }}
-            title="Change airport"
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              color: '#ffffff',
+              border: '1px solid #555',
+              cursor: 'pointer',
+              fontSize: '12px',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontWeight: 'bold'
+            }}
+            title={`Switch to ${temperatureUnit === 'F' ? 'Celsius' : 'Fahrenheit'}`}
           >
-            ✏️
+            <span style={{ opacity: temperatureUnit === 'F' ? 1 : 0.5 }}>°F</span>
+            <span style={{ margin: '0 2px' }}>/</span>
+            <span style={{ opacity: temperatureUnit === 'C' ? 1 : 0.5 }}>°C</span>
           </button>
         </div>
         <div style={{ fontSize: '14px', color: '#cccccc' }}>
@@ -609,7 +726,7 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
         )}
       </div>
 
-      <div style={{ fontSize: '13px', color: '#aaaaaa', fontFamily: 'monospace', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #444' }}>
+      <div style={{ fontSize: '13px', color: '#aaaaaa', fontFamily: 'monospace', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #444', maxWidth: '567px', wordBreak: 'break-word' }}>
         <div style={{ marginBottom: '8px' }}>
           <strong style={{ color: '#ffffff', fontSize: '14px' }}>METAR:</strong><br />
           {metarText}
@@ -621,6 +738,72 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
           </div>
         )}
       </div>
+
+      {/* 7-Day Weather Forecast */}
+      {weatherForecast && weatherForecast.length > 0 && (
+        <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #444', width: 'fit-content' }}>
+          <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px', color: '#ffffff' }}>
+            7-Day Forecast
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'row', gap: '6px', paddingBottom: '4px' }}>
+            {weatherForecast.map((forecast, index) => {
+              const forecastDate = new Date(forecast.date);
+              const today = new Date();
+              const isToday = forecastDate.toDateString() === today.toDateString();
+              
+              return (
+              <div
+                key={index}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  padding: '8px 10px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  minWidth: '75px',
+                  width: '75px',
+                  minHeight: '90px',
+                  height: 'auto',
+                  flexShrink: 0,
+                  border: isToday ? '2px solid #4A9EFF' : 'none',
+                  boxShadow: isToday ? '0 0 8px rgba(74, 158, 255, 0.5)' : 'none'
+                }}
+              >
+                <div style={{ fontSize: '28px', marginBottom: '3px' }}>
+                  {getWeatherIcon(forecast.weatherCode)}
+                </div>
+                <div style={{ fontSize: '10px', color: '#ffffff', fontWeight: 'bold', marginBottom: '3px', textAlign: 'center', lineHeight: '1.2' }}>
+                  {formatDateShort(forecast.date)}
+                </div>
+                <div style={{ fontSize: '13px', color: '#ffffff', fontWeight: 'bold', marginBottom: '2px' }}>
+                  {forecast.temperatureMax}°{temperatureUnit}
+                </div>
+                <div style={{ fontSize: '10px', color: '#aaaaaa', marginBottom: '2px' }}>
+                  {forecast.temperatureMin}°{temperatureUnit}
+                </div>
+                <div style={{ fontSize: '9px', color: '#888888', marginBottom: forecast.precipitationProbability > 0 ? '2px' : '0' }}>
+                  {formatWind(forecast.windSpeedMax, forecast.windGustMax, forecast.windDirection)}
+                </div>
+                {forecast.precipitationProbability > 0 && (
+                  <div style={{ color: '#4A9EFF', fontSize: '9px', marginTop: 'auto' }}>
+                    {forecast.precipitationProbability}%
+                  </div>
+                )}
+              </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {isLoadingForecast && (
+        <div style={{ fontSize: '12px', color: '#aaaaaa', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #444' }}>
+          Loading forecast...
+        </div>
+      )}
     </div>
   );
 }
