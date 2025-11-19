@@ -56,6 +56,7 @@ app.get('/api/taf', async (req, res) => {
   }
 });
 
+
 app.listen(PORT, () => {
   console.log(`METAR proxy server running on http://localhost:${PORT}`);
   console.log(`Proxy endpoint: http://localhost:${PORT}/api/metar`);

@@ -9,37 +9,37 @@ const OPEN_METEO_API_URL = 'https://api.open-meteo.com/v1/forecast';
 export function getWeatherIcon(weatherCode: number): string {
   // Clear sky
   if (weatherCode === 0) return '☀️';
-  
+
   // Mainly clear, partly cloudy, and overcast
   if (weatherCode >= 1 && weatherCode <= 3) return '⛅';
-  
+
   // Fog and depositing rime fog
   if (weatherCode >= 45 && weatherCode <= 48) return '🌫️';
-  
+
   // Drizzle
   if (weatherCode >= 51 && weatherCode <= 55) return '🌦️';
-  
+
   // Freezing Drizzle
   if (weatherCode >= 56 && weatherCode <= 57) return '🌨️';
-  
+
   // Rain
   if (weatherCode >= 61 && weatherCode <= 65) return '🌧️';
-  
+
   // Freezing Rain
   if (weatherCode >= 66 && weatherCode <= 67) return '🌨️';
-  
+
   // Snow fall
   if (weatherCode >= 71 && weatherCode <= 77) return '❄️';
-  
+
   // Rain showers
   if (weatherCode >= 80 && weatherCode <= 82) return '🌦️';
-  
+
   // Snow showers
   if (weatherCode >= 85 && weatherCode <= 86) return '🌨️';
-  
+
   // Thunderstorm
   if (weatherCode >= 95 && weatherCode <= 99) return '⛈️';
-  
+
   // Default
   return '☁️';
 }
@@ -78,7 +78,7 @@ export function getWeatherDescription(weatherCode: number): string {
     96: 'Thunderstorm with slight hail',
     99: 'Thunderstorm with heavy hail',
   };
-  
+
   return descriptions[weatherCode] || 'Unknown';
 }
 
@@ -99,16 +99,16 @@ export async function fetchWeatherForecast(
     url.searchParams.set('temperature_unit', temperatureUnit === 'F' ? 'fahrenheit' : 'celsius');
     url.searchParams.set('timezone', 'auto');
 
-    console.log('[Weather Service] Fetching forecast from:', url.toString());
+
 
     const response = await fetch(url.toString());
-    
+
     if (!response.ok) {
       throw new Error(`Failed to fetch weather forecast: ${response.statusText}`);
     }
 
     const data = await response.json();
-    
+
     if (!data.daily || !data.daily.time) {
       throw new Error('Invalid forecast data format');
     }
@@ -124,11 +124,11 @@ export async function fetchWeatherForecast(
       windDirection: Math.round(data.daily.winddirection_10m_dominant[index] || 0),
     }));
 
-    console.log('[Weather Service] Fetched forecast:', forecasts);
+
 
     return { forecasts };
   } catch (error) {
-    console.error('[Weather Service] Error fetching forecast:', error);
+
     throw error;
   }
 }

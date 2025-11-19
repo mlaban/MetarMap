@@ -30,7 +30,7 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
   const [showWinds, setShowWinds] = useState(false);
   const radarLayerRef = useRef<L.TileLayer | null>(null);
   const satelliteLayerRef = useRef<L.TileLayer | null>(null);
-  
+
   // Auto-move state
   const autoMoveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const currentAngleRef = useRef<number>(0);
@@ -63,10 +63,7 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
     // Perform small circular movement to prevent burn-in (just a few pixels)
     const performAutoMove = () => {
       if (!mapRef.current || isMovingRef.current) {
-        console.log('[AutoMove] Skipping - map not ready or already moving', { 
-          mapReady: !!mapRef.current, 
-          isMoving: isMovingRef.current 
-        });
+
         return;
       }
 
@@ -78,22 +75,18 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
 
       isMovingRef.current = true;
       const currentZoom = mapRef.current.getZoom();
-      
+
       // Small radius: 0.005 degrees (roughly 500m or a few pixels at zoom 7-10)
       // Adjust radius based on zoom - smaller at higher zoom
       const baseRadius = 0.005;
       const zoomFactor = Math.max(0.5, Math.min(1.5, 10 / currentZoom));
       const radiusDegrees = baseRadius * zoomFactor;
-      
+
       // Calculate next position in circle (move 30 degrees each time)
       const newPosition = getCircularPosition(initialCenterRef.current, currentAngleRef.current, radiusDegrees);
-      
-      console.log('[AutoMove] Moving in circle', { 
-        angle: currentAngleRef.current, 
-        radius: radiusDegrees,
-        position: newPosition 
-      });
-      
+
+
+
       // Pan to new position with smooth animation (keep current zoom level)
       mapRef.current.flyTo(newPosition, currentZoom, {
         duration: 1.5,
@@ -103,7 +96,7 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
       // After movement completes, mark as ready for next move
       setTimeout(() => {
         isMovingRef.current = false;
-        console.log('[AutoMove] Movement complete, ready for next');
+
       }, 1500); // Wait for animation to complete
 
       // Move to next angle in circle (30 degrees per step = 12 steps for full circle)
@@ -130,13 +123,13 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
         subdomains: 'abcd',
         maxZoom: 19
       }).addTo(mapRef.current);
-      
+
       // Set map container background to black for unloaded tiles
       const mapContainer = document.getElementById('map');
       if (mapContainer) {
         mapContainer.style.backgroundColor = '#000000';
       }
-      
+
       // Note: Raster tiles are pre-rendered and cannot filter specific features like small water bodies.
       // To hide small water bodies, you would need to use vector tiles with custom styling.
     }
@@ -172,7 +165,7 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
   // Initialize and update radar layer when visibility changes
   useEffect(() => {
     if (!mapRef.current) return;
-    
+
     // Remove old layer if it exists
     if (radarLayerRef.current) {
       radarLayerRef.current.remove();
@@ -219,17 +212,15 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
   // }, [showSatellite]);
 
   useEffect(() => {
-    console.log('[Map] airportMETARs changed, updating markers');
-    console.log('[Map] airportMETARs count:', airportMETARs.length);
-    console.log('[Map] airportMETARs data:', airportMETARs);
-    
+
+
     // Update markers when airportMETARs change
     if (!mapRef.current) {
-      console.warn('[Map] Map not initialized, skipping marker update');
+
       return;
     }
 
-    console.log('[Map] Removing existing markers, count:', markersRef.current.length);
+
     // Remove existing markers
     markersRef.current.forEach(marker => {
       mapRef.current?.removeLayer(marker);
@@ -252,19 +243,19 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
     labelsRef.current = [];
     tafArrowsRef.current = [];
 
-    console.log('[Map] Adding new markers for', airportMETARs.length, 'airports');
+
     // Add new markers
     airportMETARs.forEach(({ airport, flightCategory }) => {
-      console.log(`[Map] Adding marker for ${airport.icao} at [${airport.latitude}, ${airport.longitude}], category: ${flightCategory}`);
+
       const color = FlightCategoryColors[flightCategory] || FlightCategoryColors.UNKNOWN;
-      
+
       // VFR markers are slightly larger, MVFR markers are 25% larger, UNKNOWN markers are half size
       const isVFR = flightCategory === FlightCategory.VFR;
       const isMVFR = flightCategory === FlightCategory.MVFR;
       const isUnknown = flightCategory === FlightCategory.UNKNOWN;
       let outerRadius = 2;
       let coreRadius = 1;
-      
+
       if (isVFR) {
         outerRadius = 1.7; // Slightly larger for VFR (green dots)
         coreRadius = 1.0;
@@ -275,7 +266,7 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
         outerRadius = 1; // Half size
         coreRadius = 0.5;
       }
-      
+
       // Create outer colored circle with glow
       const marker = L.circleMarker(
         [airport.latitude, airport.longitude],
@@ -321,33 +312,33 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
       const airportData = airportMETARs.find(am => am.airport.icao === airport.icao);
       const windGust = airportData?.metar?.wgst || (airportData?.metar as any)?.windGustKt;
       const hasHighGusts = windGust !== undefined && windGust >= 17;
-      
+
       // Add LED glow effect to outer marker
-      marker.on('add', function() {
+      marker.on('add', function () {
         const element = this.getElement();
         if (element) {
           // Apply outer glow effect (scaled down for smaller markers)
           element.style.filter = `drop-shadow(0 0 1.5px ${color}) drop-shadow(0 0 3px ${color}) drop-shadow(0 0 4px ${color})`;
           element.style.transition = 'filter 0.2s ease, opacity 0.5s ease';
-          
+
           // Add blinking animation for high gusts with random delay
           if (hasHighGusts) {
             element.classList.add('airport-marker-gust');
             // Random delay between 0 and 1 second to desynchronize blinking
             const randomDelay = Math.random();
             element.style.animationDelay = `${randomDelay}s`;
-            console.log(`[Map] High gusts detected for ${airport.icao}: ${windGust} kt - adding blink animation with ${randomDelay.toFixed(2)}s delay`);
+
           }
-          
+
           // Add hover effect for brighter glow
-          element.addEventListener('mouseenter', function() {
+          element.addEventListener('mouseenter', function () {
             this.style.filter = `drop-shadow(0 0 2px ${color}) drop-shadow(0 0 4px ${color}) drop-shadow(0 0 6px ${color}) drop-shadow(0 0 8px ${color})`;
             if (hasHighGusts) {
               this.style.animationPlayState = 'paused';
             }
           });
-          
-          element.addEventListener('mouseleave', function() {
+
+          element.addEventListener('mouseleave', function () {
             this.style.filter = `drop-shadow(0 0 1.5px ${color}) drop-shadow(0 0 3px ${color}) drop-shadow(0 0 4px ${color})`;
             if (hasHighGusts) {
               this.style.animationPlayState = 'running';
@@ -357,12 +348,12 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
       });
 
       // Add bright glow to center core
-      coreMarker.on('add', function() {
+      coreMarker.on('add', function () {
         const element = this.getElement();
         if (element) {
           element.style.filter = `drop-shadow(0 0 1px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 2px rgba(255, 255, 255, 0.6))`;
           element.style.transition = 'opacity 0.5s ease';
-          
+
           // Add blinking animation for high gusts with random delay
           if (hasHighGusts) {
             element.classList.add('airport-marker-gust');
@@ -375,31 +366,31 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
 
       // Add popup with airport info
       const metarText = airportData?.metar?.rawOb || airportData?.metar?.rawText || 'No METAR available';
-      
+
       // Handle visibility (convert meters to miles if needed)
       let visibilityMi = airportData?.metar?.visibilityStatuteMi;
       if (!visibilityMi && airportData?.metar?.visib !== undefined) {
         visibilityMi = airportData.metar.visib * 0.000621371;
       }
-      const visibility = visibilityMi 
+      const visibility = visibilityMi
         ? `${visibilityMi.toFixed(1)} mi`
         : 'N/A';
-      
+
       // Handle wind (use wspd/wdir or windSpeedKt/windDirDegrees)
       const windDir = airportData?.metar?.wdir || airportData?.metar?.windDirDegrees;
       const windSpeed = airportData?.metar?.wspd || airportData?.metar?.windSpeedKt;
-      const wind = windSpeed 
+      const wind = windSpeed
         ? `${windDir || 'VRB'}° @ ${windSpeed} kt`
         : 'N/A';
-      
+
       // Get TAF data
       const taf = airportMETARs.find(am => am.airport.icao === airport.icao)?.taf;
       const tafText = taf?.rawTAF || taf?.rawOb || taf?.rawText || 'No TAF available';
-      
+
       // Determine trend (improving, worsening, or stable)
       const previousCategory = previousCategoriesRef.current.get(airport.icao);
       let trend: 'improving' | 'worsening' | 'stable' | null = null;
-      
+
       if (previousCategory && previousCategory !== flightCategory) {
         const categoryOrder = {
           [FlightCategory.LIFR]: 0,
@@ -409,7 +400,7 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
         };
         const prevOrder = categoryOrder[previousCategory] ?? 2;
         const currOrder = categoryOrder[flightCategory] ?? 2;
-        
+
         if (currOrder > prevOrder) {
           trend = 'improving'; // Better category (higher number = better)
         } else if (currOrder < prevOrder) {
@@ -418,10 +409,10 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
       } else if (previousCategory) {
         trend = 'stable';
       }
-      
+
       // Update previous category
       previousCategoriesRef.current.set(airport.icao, flightCategory);
-      
+
       // Function to create popup content
       const createPopupContent = (airportData: AirportMETAR, trend: 'improving' | 'worsening' | 'stable' | null, previousCategory?: FlightCategory) => {
         const metar = airportData.metar;
@@ -430,21 +421,21 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
         const categoryColor = FlightCategoryColors[category];
         const metarText = metar?.rawOb || metar?.rawText || 'No METAR available';
         const tafText = taf?.rawTAF || taf?.rawOb || taf?.rawText || 'No TAF available';
-        
+
         let visibilityMi = metar?.visibilityStatuteMi;
         if (!visibilityMi && metar?.visib !== undefined) {
           visibilityMi = metar.visib * 0.000621371;
         }
-        const visibility = visibilityMi 
+        const visibility = visibilityMi
           ? `${visibilityMi.toFixed(1)} mi`
           : 'N/A';
-        
+
         const windDir = metar?.wdir || metar?.windDirDegrees;
         const windSpeed = metar?.wspd || metar?.windSpeedKt;
-        const wind = windSpeed 
+        const wind = windSpeed
           ? `${windDir || 'VRB'}° @ ${windSpeed} kt`
           : 'N/A';
-        
+
         // Trend display at bottom
         let trendDisplay = '';
         if (trend && previousCategory) {
@@ -461,7 +452,7 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
             </div>
           `;
         }
-        
+
         return `
           <div style="color: white; font-family: Arial, sans-serif; min-width: 200px;">
             <div style="margin-bottom: 4px;">
@@ -485,16 +476,16 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
           </div>
         `;
       };
-      
+
       const popupContent = createPopupContent(
         airportMETARs.find(am => am.airport.icao === airport.icao)!,
         trend,
         previousCategory || undefined
       );
-      
+
       // Bind popup to hit box marker (larger clickable area)
       const popup = hitBoxMarker.bindPopup(popupContent);
-      
+
       // Make visible markers non-interactive so clicks go to hit box
       marker.options.interactive = false;
       coreMarker.options.interactive = false;
@@ -506,7 +497,7 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
       hitBoxMarkersRef.current.push(hitBoxMarker);
       markersRef.current.push(marker);
       coreMarkersRef.current.push(coreMarker);
-      
+
       // Format wind conditions for display and determine color
       // Only show winds if max wind speed (including gusts) is > 30 knots
       let windConditionsText = '';
@@ -516,7 +507,7 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
         const windDir = airportData.metar.wdir || airportData.metar.windDirDegrees;
         const windGustValue = windGust || 0;
         const maxWind = Math.max(windSpeed, windGustValue);
-        
+
         // Only show winds if max wind speed is greater than 30 knots
         if (maxWind > 30) {
           if (hasHighGusts && windGustValue > 0) {
@@ -530,7 +521,7 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
               windConditionsText = `${Math.round(windSpeed)}KT`;
             }
           }
-          
+
           // Color code based on max wind speed (including gusts)
           if (maxWind > 40) {
             windColor = '#FF00FF'; // Magenta
@@ -545,17 +536,17 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
           }
         }
       }
-      
+
       // Add airport name label - alternate between ICAO and winds with smooth transitions
       // Only create label if showAirportLabels is true
       // Make VFR labels smaller and more subtle to declutter
       if (showAirportLabels) {
         const labelId = `airport-label-${airport.icao}`;
         const staggerDelay = getStaggerDelay(airport.icao);
-        
+
         // Determine what to show: winds if showWinds is true, windToggleEnabled is true, and we have wind data, otherwise ICAO
         const shouldShowWinds = windToggleEnabled && showWinds && windConditionsText;
-        
+
         // Make VFR labels smaller and more transparent to reduce clutter
         const isVFR = flightCategory === FlightCategory.VFR;
         const icaoFontSize = isVFR ? '7px' : '8px';
@@ -563,7 +554,7 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
         const windFontSize = '7px';
         const labelHeight = isVFR ? 10 : 12;
         const labelHeightStr = `${labelHeight}px`;
-        
+
         // Create both elements with smooth crossfade transitions
         // Always create wind element if windConditionsText exists, even if not showing initially
         const labelHtml = `<div id="${labelId}" style="
@@ -625,14 +616,14 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
               z-index: 1;
             ">${windConditionsText}</div>` : ''}
           </div>`;
-        
+
         const labelIcon = L.divIcon({
           className: 'airport-label',
           html: labelHtml,
           iconSize: [40, labelHeight],
           iconAnchor: [20, labelHeight], // Anchor at bottom center, so label appears above
         });
-        
+
         // Offset label closer to marker to reduce clutter
         const labelLat = airport.latitude + 0.004; // Reduced offset (was 0.008)
         const labelMarker = L.marker([labelLat, airport.longitude], {
@@ -640,17 +631,17 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
           zIndexOffset: 500,
           interactive: false,
         });
-        
+
         labelMarker.addTo(mapRef.current!);
         labelsRef.current.push(labelMarker);
       }
-      
+
       // Add TAF forecast arrow indicator
       const nextCondition = airportData?.taf ? getNextTAFCondition(airportData.taf) : null;
-      
+
       if (nextCondition) {
         const arrowColor = FlightCategoryColors[nextCondition];
-        
+
         // Create arrow icon pointing right (indicating future forecast)
         const arrowIcon = L.divIcon({
           className: 'taf-arrow-indicator',
@@ -665,25 +656,25 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
           iconSize: [10, 12],
           iconAnchor: [0, 6],
         });
-        
+
         // Position arrow to the right of the marker
         const arrowLat = airport.latitude;
         const arrowLon = airport.longitude + 0.012; // Offset to the right
-        
+
         const arrowMarker = L.marker([arrowLat, arrowLon], {
           icon: arrowIcon,
           zIndexOffset: 400,
           interactive: false,
         });
-        
+
         arrowMarker.addTo(mapRef.current!);
         tafArrowsRef.current.push(arrowMarker);
       }
-      
-      console.log(`[Map] Marker added for ${airport.icao}`);
+
+
     });
-    
-    console.log('[Map] Finished updating markers, total markers:', markersRef.current.length);
+
+
   }, [airportMETARs, showWinds, windToggleEnabled, showAirportLabels]);
 
   // Alternate between showing ICAO and winds every 3 seconds
@@ -731,20 +722,20 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
       const labelId = `airport-label-${airport.airport.icao}`;
       const icaoElement = document.getElementById(`${labelId}-icao`);
       const windElement = document.getElementById(`${labelId}-wind`);
-      
+
       if (!icaoElement) return;
 
       const staggerDelay = getStaggerDelay(airport.airport.icao);
       const airportData = airportMETARs.find(am => am.airport.icao === airport.airport.icao);
       const windGust = airportData?.metar?.wgst || (airportData?.metar as any)?.windGustKt;
       const hasHighGusts = windGust !== undefined && windGust >= 17;
-      
+
       let windConditionsText = '';
       if (airportData?.metar) {
         const windSpeed = airportData.metar.wspd || airportData.metar.windSpeedKt || 0;
         const windGustValue = windGust || 0;
         const maxWind = Math.max(windSpeed, windGustValue);
-        
+
         // Only show winds if max wind speed is greater than 30 knots
         if (maxWind > 30) {
           if (hasHighGusts && windGustValue > 0) {

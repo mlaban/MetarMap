@@ -21,33 +21,33 @@ export function getNextTAFCondition(taf: TAF | null): FlightCategory | null {
   }
 
   const now = Math.floor(Date.now() / 1000); // Current time in seconds since epoch
-  
+
   // Find the next forecast period that hasn't started yet, or the current one
   for (const fcst of taf.fcsts) {
     const validFrom = fcst.validTimeFrom || 0;
     const validTo = fcst.validTimeTo || Infinity;
-    
+
     // If this forecast period is in the future or currently active
     if (validFrom >= now || (now >= validFrom && now <= validTo)) {
       // Determine flight category from forecast
       const category = determineFlightCategoryFromForecast(fcst);
       if (category) {
-        console.log(`[TAF Parser] Next condition for ${taf.icaoId}: ${category} (valid from ${new Date(validFrom * 1000).toISOString()})`);
+
         return category;
       }
     }
   }
-  
+
   // If no future forecast found, use the last one
   const lastFcst = taf.fcsts[taf.fcsts.length - 1];
   if (lastFcst) {
     const category = determineFlightCategoryFromForecast(lastFcst);
     if (category) {
-      console.log(`[TAF Parser] Using last forecast condition for ${taf.icaoId}: ${category}`);
+
       return category;
     }
   }
-  
+
   return null;
 }
 
@@ -55,8 +55,8 @@ export function getNextTAFCondition(taf: TAF | null): FlightCategory | null {
  * Determines flight category from a TAF forecast period
  */
 function determineFlightCategoryFromForecast(fcst: any): FlightCategory | null {
-  console.log('[TAF Parser] Parsing forecast:', fcst);
-  
+
+
   // Check if flight category is directly provided
   if (fcst.flightCategory) {
     const cat = fcst.flightCategory.toUpperCase();
@@ -64,11 +64,11 @@ function determineFlightCategoryFromForecast(fcst: any): FlightCategory | null {
       return cat as FlightCategory;
     }
   }
-  
+
   // Parse visibility (may be in statute miles or meters)
   // TAF visibility can be in different formats: "P6SM" (6+ SM), "6SM", or meters
   let visibilityMi: number | undefined;
-  
+
   if (fcst.visibilityStatuteMi !== undefined) {
     visibilityMi = fcst.visibilityStatuteMi;
   } else if (fcst.visibility !== undefined) {
@@ -93,11 +93,11 @@ function determineFlightCategoryFromForecast(fcst: any): FlightCategory | null {
       }
     }
   }
-  
+
   // Parse ceiling (in feet AGL)
   // Look for cloud layers: BKN050, OVC080, etc.
   let ceilingFt: number | undefined = fcst.ceiling;
-  
+
   if (!ceilingFt && (fcst.rawOb || fcst.rawText)) {
     const rawText = (fcst.rawOb || fcst.rawText || '').toUpperCase();
     // Find BKN or OVC cloud layers (these constitute ceilings)
@@ -106,15 +106,15 @@ function determineFlightCategoryFromForecast(fcst: any): FlightCategory | null {
       ceilingFt = parseInt(cloudMatch[2]) * 100; // Convert to feet (e.g., 050 -> 5000ft)
     }
   }
-  
-  console.log(`[TAF Parser] Parsed visibility: ${visibilityMi} mi, ceiling: ${ceilingFt} ft`);
-  
+
+
+
   // Determine category based on FAA/NWS standards
   if (visibilityMi !== undefined && ceilingFt !== undefined) {
     // Both available - use the more restrictive
     let visCategory: FlightCategory;
     let ceilCategory: FlightCategory;
-    
+
     if (visibilityMi < 1) {
       visCategory = FlightCategory.LIFR;
     } else if (visibilityMi >= 1 && visibilityMi < 3) {
@@ -124,7 +124,7 @@ function determineFlightCategoryFromForecast(fcst: any): FlightCategory | null {
     } else {
       visCategory = FlightCategory.VFR;
     }
-    
+
     if (ceilingFt < 500) {
       ceilCategory = FlightCategory.LIFR;
     } else if (ceilingFt >= 500 && ceilingFt < 1000) {
@@ -134,7 +134,7 @@ function determineFlightCategoryFromForecast(fcst: any): FlightCategory | null {
     } else {
       ceilCategory = FlightCategory.VFR;
     }
-    
+
     // Use the worse category
     const categoryOrder = {
       [FlightCategory.LIFR]: 0,
@@ -142,7 +142,7 @@ function determineFlightCategoryFromForecast(fcst: any): FlightCategory | null {
       [FlightCategory.MVFR]: 2,
       [FlightCategory.VFR]: 3,
     };
-    
+
     return categoryOrder[visCategory] < categoryOrder[ceilCategory] ? visCategory : ceilCategory;
   } else if (visibilityMi !== undefined) {
     if (visibilityMi < 1) return FlightCategory.LIFR;
@@ -155,7 +155,7 @@ function determineFlightCategoryFromForecast(fcst: any): FlightCategory | null {
     if (ceilingFt >= 1000 && ceilingFt < 3000) return FlightCategory.MVFR;
     return FlightCategory.VFR;
   }
-  
+
   // If no visibility or ceiling, check for clear conditions (VFR)
   if (fcst.rawOb || fcst.rawText) {
     const rawText = (fcst.rawOb || fcst.rawText || '').toUpperCase();
@@ -163,7 +163,7 @@ function determineFlightCategoryFromForecast(fcst: any): FlightCategory | null {
       return FlightCategory.VFR;
     }
   }
-  
+
   return null;
 }
 

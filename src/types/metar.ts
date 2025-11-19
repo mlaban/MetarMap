@@ -17,6 +17,8 @@ export interface METAR {
   windDirDegrees?: number;  // Some APIs use windDirDegrees
   wspd?: number;  // API uses wspd (wind speed in knots)
   windSpeedKt?: number;  // Some APIs use windSpeedKt
+  wgst?: number;  // API uses wgst (wind gust in knots)
+  windGustKt?: number;  // Some APIs use windGustKt
   visib?: number;  // API uses visib (may be in statute miles or meters - check rawOb for units)
   visibilityStatuteMi?: number;  // Some APIs use visibilityStatuteMi
   altim?: number;  // API uses altim (altimeter in inches)

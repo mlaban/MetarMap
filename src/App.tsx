@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import Map from './components/Map';
+import CesiumMap from './components/CesiumMap';
 import LoadingSpinner from './components/LoadingSpinner';
 import StatusBar from './components/StatusBar';
 import AirportOverlay from './components/AirportOverlay';
@@ -34,86 +34,62 @@ function App() {
 
     if (isRefresh && !forceRefresh && timeSinceLastRefresh < REFRESH_INTERVAL_MS) {
       const remainingSeconds = Math.ceil((REFRESH_INTERVAL_MS - timeSinceLastRefresh) / 1000);
-      console.log(`[App] Refresh rate limited. Please wait ${remainingSeconds} more seconds.`);
+
       return;
     }
 
-    console.log('[App] loadWeatherData called, isRefresh:', isRefresh, 'forceRefresh:', forceRefresh);
-    console.log('[App] Number of airports to fetch:', AIRPORTS.length);
-    console.log('[App] Airport list:', AIRPORTS.map(a => a.icao));
+
 
     if (isRefresh) {
       setIsRefreshing(true);
-      console.log('[App] Setting isRefreshing to true');
+
     } else {
       setIsLoading(true);
-      console.log('[App] Setting isLoading to true');
+
     }
     setError(null);
 
     try {
-      console.log('[App] Calling fetchMETARs...');
+
       const data = await fetchMETARs(AIRPORTS);
-      console.log('[App] Received data from fetchMETARs:', data);
-      console.log('[App] Data length:', data.length);
-      console.log('[App] Data with METARs:', data.filter(d => d.metar !== null).length);
-      console.log('[App] Data with TAFs:', data.filter(d => d.taf !== null).length);
+
 
       setAirportMETARs(data);
       setLastUpdate(new Date());
       lastRefreshTimeRef.current = now;
-      console.log('[App] State updated successfully');
+
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load weather data';
-      console.error('[App] Error loading weather data:', err);
-      console.error('[App] Error details:', {
-        message: errorMessage,
-        error: err,
-        stack: err instanceof Error ? err.stack : undefined
-      });
+
       setError(errorMessage);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
-      console.log('[App] Loading states reset');
+
     }
   }, []);
 
   // Initial load
   useEffect(() => {
-    console.log('[App] Component mounted, starting initial load');
+
     loadWeatherData();
   }, [loadWeatherData]);
 
   // Auto-refresh every 5 minutes (force refresh to bypass rate limit)
   useEffect(() => {
-    console.log('[App] Setting up auto-refresh interval:', REFRESH_INTERVAL_MS, 'ms');
+    
     const interval = setInterval(() => {
-      console.log('[App] Auto-refresh triggered');
+      
       loadWeatherData(true, true); // Force refresh for auto-refresh
     }, REFRESH_INTERVAL_MS);
 
     return () => {
-      console.log('[App] Cleaning up auto-refresh interval');
+      
       clearInterval(interval);
     };
   }, [loadWeatherData]);
 
-  // Debug: Log state changes
-  useEffect(() => {
-    console.log('[App] State update:', {
-      airportMETARsCount: airportMETARs.length,
-      isLoading,
-      isRefreshing,
-      lastUpdate,
-      error,
-      airportMETARs: airportMETARs.map(am => ({
-        icao: am.airport.icao,
-        hasMETAR: am.metar !== null,
-        category: am.flightCategory
-      }))
-    });
-  }, [airportMETARs, isLoading, isRefreshing, lastUpdate, error]);
+
 
   return (
     <div style={{ width: '100vw', height: '100vh', margin: 0, padding: 0, overflow: 'hidden', backgroundColor: '#000000' }}>
@@ -134,7 +110,7 @@ function App() {
           Error: {error}
         </div>
       )}
-      <Map
+      <CesiumMap
         airportMETARs={airportMETARs}
         center={NY_CENTER}
         zoom={NY_ZOOM}
@@ -150,7 +126,7 @@ function App() {
 
           if (timeSinceLastRefresh < REFRESH_INTERVAL_MS) {
             const remainingSeconds = Math.ceil((REFRESH_INTERVAL_MS - timeSinceLastRefresh) / 1000);
-            console.log(`[App] Individual airport refresh rate limited. Please wait ${remainingSeconds} more seconds.`);
+
             return;
           }
 
@@ -190,4 +166,3 @@ function App() {
 }
 
 export default App;
-

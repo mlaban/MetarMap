@@ -31,7 +31,7 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
     // Load from localStorage on mount, default to F
     return (localStorage.getItem(TEMP_UNIT_STORAGE_KEY) as 'C' | 'F') || 'F';
   });
-  
+
   // Position state for dragging
   const [position, setPosition] = useState<{ top: number; left: number }>(() => {
     // Load position from localStorage or use default
@@ -47,12 +47,12 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
     // Default position: bottom right (converted to top/left)
     return { top: window.innerHeight - 400, left: window.innerWidth - 500 };
   });
-  
+
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const overlayRef = useRef<HTMLDivElement>(null);
   const positionRef = useRef(position);
-  
+
   // Keep positionRef in sync with position state
   useEffect(() => {
     positionRef.current = position;
@@ -61,13 +61,13 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
   // Load weather forecast
   const loadForecast = useCallback(async (latitude: number, longitude: number) => {
     if (!latitude || !longitude) return;
-    
+
     setIsLoadingForecast(true);
     try {
       const forecast = await fetchWeatherForecast(latitude, longitude, temperatureUnit);
       setWeatherForecast(forecast.forecasts);
     } catch (err) {
-      console.error('[Airport Overlay] Error fetching forecast:', err);
+
       setWeatherForecast(null);
     } finally {
       setIsLoadingForecast(false);
@@ -112,7 +112,7 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
         }
       })
       .catch(err => {
-        console.error('[Airport Overlay] Error fetching airport:', err);
+
         setError('Failed to load airport data');
         setAirportData(null);
       })
@@ -163,7 +163,7 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
     if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.closest('button') || target.closest('input')) {
       return;
     }
-    
+
     if (overlayRef.current) {
       const rect = overlayRef.current.getBoundingClientRect();
       setDragOffset({
@@ -179,16 +179,16 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
       if (isDragging && overlayRef.current) {
         const newLeft = e.clientX - dragOffset.x;
         const newTop = e.clientY - dragOffset.y;
-        
+
         // Constrain to viewport bounds
         const maxLeft = window.innerWidth - overlayRef.current.offsetWidth;
         const maxTop = window.innerHeight - overlayRef.current.offsetHeight;
-        
+
         const constrainedPosition = {
           left: Math.max(0, Math.min(newLeft, maxLeft)),
           top: Math.max(0, Math.min(newTop, maxTop))
         };
-        
+
         setPosition(constrainedPosition);
       }
     };
@@ -234,10 +234,10 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
 
     // Validate on mount (after first render)
     const timeoutId = setTimeout(validatePosition, 0);
-    
+
     // Validate on resize
     window.addEventListener('resize', validatePosition);
-    
+
     return () => {
       clearTimeout(timeoutId);
       window.removeEventListener('resize', validatePosition);
@@ -247,12 +247,12 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
   // Helper function to determine if it's windy and get wind conditions text
   const getWindConditions = () => {
     if (!airportData?.metar) return null;
-    
+
     const windSpeed = airportData.metar.wspd || airportData.metar.windSpeedKt || 0;
     const windDir = airportData.metar.wdir || airportData.metar.windDirDegrees;
     const windGust = airportData.metar.wgst || (airportData.metar as any)?.windGustKt || 0;
     const maxWind = Math.max(windSpeed, windGust);
-    
+
     // Consider it windy if wind speed (including gusts) is >= 15 knots
     if (maxWind >= 15) {
       let windText = '';
@@ -274,7 +274,7 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+
     if (date.toDateString() === today.toDateString()) {
       return 'Today';
     } else if (date.toDateString() === tomorrow.toDateString()) {
@@ -290,7 +290,7 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+
     if (date.toDateString() === today.toDateString()) {
       return 'Today';
     } else if (date.toDateString() === tomorrow.toDateString()) {
@@ -310,7 +310,7 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
     if (windSpeedKmh === 0) return 'CALM';
     const knots = kmhToKnots(windSpeedKmh);
     const gustKnots = windGustKmh > 0 ? kmhToKnots(windGustKmh) : 0;
-    
+
     // Only show gusts if they're >= 10 knots and exceed base wind speed
     if (gustKnots >= 10 && gustKnots > knots) {
       return `${knots}G${gustKnots}KT`;
@@ -379,16 +379,16 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
           <button
             onClick={handleSetIcao}
             disabled={inputIcao.trim().length < 3}
-              style={{
-                backgroundColor: '#4CAF50',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                padding: '8px 16px',
-                cursor: inputIcao.trim().length < 3 ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-                opacity: inputIcao.trim().length < 3 ? 0.5 : 1
-              }}
+            style={{
+              backgroundColor: '#4CAF50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '8px 16px',
+              cursor: inputIcao.trim().length < 3 ? 'not-allowed' : 'pointer',
+              fontSize: '14px',
+              opacity: inputIcao.trim().length < 3 ? 0.5 : 1
+            }}
           >
             Set
           </button>
@@ -508,7 +508,7 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
     const isUnknown = category === FlightCategory.UNKNOWN;
     let outerRadius = 2;
     let coreRadius = 1;
-    
+
     if (isVFR) {
       outerRadius = 1.485; // 10% bigger (1.35 * 1.1)
       coreRadius = 0.7425; // 10% bigger (0.675 * 1.1)
@@ -519,7 +519,7 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
       outerRadius = 1; // Half size
       coreRadius = 0.5;
     }
-    
+
     return { outerRadius, coreRadius };
   };
 
@@ -540,7 +540,7 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
     const windSpeed = airportData.metar.wspd || airportData.metar.windSpeedKt || 0;
     const windGust = airportData.metar.wgst || (airportData.metar as any)?.windGustKt || 0;
     const maxWind = Math.max(windSpeed, windGust);
-    
+
     if (maxWind > 40) return '#FF00FF'; // Magenta
     if (maxWind > 30) return '#FF0000'; // Red
     if (maxWind > 20) return '#FF8000'; // Orange
@@ -671,9 +671,9 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
           </div>
           <div style={{ fontSize: '14px', color: metarColor, fontWeight: 'bold' }}>{metarCategory}</div>
           {windConditions && (
-            <div style={{ 
-              fontSize: '12px', 
-              color: getWindColor(), 
+            <div style={{
+              fontSize: '12px',
+              color: getWindColor(),
               fontWeight: 'normal',
               marginLeft: '8px',
               textShadow: `0 0 2px ${getWindColor()}, 0 0 4px ${getWindColor()}`
@@ -750,49 +750,49 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
               const forecastDate = new Date(forecast.date);
               const today = new Date();
               const isToday = forecastDate.toDateString() === today.toDateString();
-              
+
               return (
-              <div
-                key={index}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'flex-start',
-                  padding: '8px 10px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  minWidth: '75px',
-                  width: '75px',
-                  minHeight: '90px',
-                  height: 'auto',
-                  flexShrink: 0,
-                  border: isToday ? '2px solid #4A9EFF' : 'none',
-                  boxShadow: isToday ? '0 0 8px rgba(74, 158, 255, 0.5)' : 'none'
-                }}
-              >
-                <div style={{ fontSize: '28px', marginBottom: '3px' }}>
-                  {getWeatherIcon(forecast.weatherCode)}
-                </div>
-                <div style={{ fontSize: '10px', color: '#ffffff', fontWeight: 'bold', marginBottom: '3px', textAlign: 'center', lineHeight: '1.2' }}>
-                  {formatDateShort(forecast.date)}
-                </div>
-                <div style={{ fontSize: '13px', color: '#ffffff', fontWeight: 'bold', marginBottom: '2px' }}>
-                  {forecast.temperatureMax}°{temperatureUnit}
-                </div>
-                <div style={{ fontSize: '10px', color: '#aaaaaa', marginBottom: '2px' }}>
-                  {forecast.temperatureMin}°{temperatureUnit}
-                </div>
-                <div style={{ fontSize: '9px', color: '#888888', marginBottom: forecast.precipitationProbability > 0 ? '2px' : '0' }}>
-                  {formatWind(forecast.windSpeedMax, forecast.windGustMax, forecast.windDirection)}
-                </div>
-                {forecast.precipitationProbability > 0 && (
-                  <div style={{ color: '#4A9EFF', fontSize: '9px', marginTop: 'auto' }}>
-                    {forecast.precipitationProbability}%
+                <div
+                  key={index}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'flex-start',
+                    padding: '8px 10px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    minWidth: '75px',
+                    width: '75px',
+                    minHeight: '90px',
+                    height: 'auto',
+                    flexShrink: 0,
+                    border: isToday ? '2px solid #4A9EFF' : 'none',
+                    boxShadow: isToday ? '0 0 8px rgba(74, 158, 255, 0.5)' : 'none'
+                  }}
+                >
+                  <div style={{ fontSize: '28px', marginBottom: '3px' }}>
+                    {getWeatherIcon(forecast.weatherCode)}
                   </div>
-                )}
-              </div>
+                  <div style={{ fontSize: '10px', color: '#ffffff', fontWeight: 'bold', marginBottom: '3px', textAlign: 'center', lineHeight: '1.2' }}>
+                    {formatDateShort(forecast.date)}
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#ffffff', fontWeight: 'bold', marginBottom: '2px' }}>
+                    {forecast.temperatureMax}°{temperatureUnit}
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#aaaaaa', marginBottom: '2px' }}>
+                    {forecast.temperatureMin}°{temperatureUnit}
+                  </div>
+                  <div style={{ fontSize: '9px', color: '#888888', marginBottom: forecast.precipitationProbability > 0 ? '2px' : '0' }}>
+                    {formatWind(forecast.windSpeedMax, forecast.windGustMax, forecast.windDirection)}
+                  </div>
+                  {forecast.precipitationProbability > 0 && (
+                    <div style={{ color: '#4A9EFF', fontSize: '9px', marginTop: 'auto' }}>
+                      {forecast.precipitationProbability}%
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
