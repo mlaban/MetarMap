@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { AirportMETAR, fetchSingleAirport } from '../services/metarService';
 import { FlightCategoryColors, FlightCategory } from '../types/flightCategory';
-import { getNextTAFCondition } from '../utils/tafParser';
+import { getNextTAFCondition, decodeTAFPeriods } from '../utils/tafParser';
 import { Airport } from '../types/airport';
 import { fetchWeatherForecast, getWeatherIcon, getWeatherDescription } from '../services/weatherService';
 import { WeatherForecast } from '../types/weatherForecast';
@@ -31,6 +31,7 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
     // Load from localStorage on mount, default to F
     return (localStorage.getItem(TEMP_UNIT_STORAGE_KEY) as 'C' | 'F') || 'F';
   });
+  const [selectedForecast, setSelectedForecast] = useState<WeatherForecast | null>(null);
 
   // Position state for dragging
   const [position, setPosition] = useState<{ top: number; left: number }>(() => {
@@ -305,8 +306,12 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
     return Math.round(kmh * 0.539957);
   };
 
-  // Format wind for display
-  const formatWind = (windSpeedKmh: number, windGustKmh: number, windDirection: number): string => {
+  // Format wind for display - use average wind speeds for more realistic values
+  const formatWind = (forecast: WeatherForecast): string => {
+    // Use average wind speeds instead of max for more realistic display
+    const windSpeedKmh = forecast.windSpeedAvg || forecast.windSpeedMax || 0;
+    const windGustKmh = forecast.windGustAvg || forecast.windGustMax || 0;
+    
     if (windSpeedKmh === 0) return 'CALM';
     const knots = kmhToKnots(windSpeedKmh);
     const gustKnots = windGustKmh > 0 ? kmhToKnots(windGustKmh) : 0;
@@ -533,6 +538,7 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
   const metarText = airportData.metar?.rawOb || airportData.metar?.rawText || 'No METAR available';
   const tafText = airportData.taf?.rawTAF || airportData.taf?.rawOb || airportData.taf?.rawText || 'No TAF available';
   const windConditions = getWindConditions();
+  const decodedTAFPeriods = airportData.taf ? decodeTAFPeriods(airportData.taf) : [];
 
   // Get wind color based on wind speed
   const getWindColor = () => {
@@ -739,6 +745,129 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
         )}
       </div>
 
+      {/* Decoded TAF Forecast */}
+      {decodedTAFPeriods.length > 0 && (
+        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #444' }}>
+          <div style={{ fontSize: '11px', color: '#888', fontFamily: 'monospace', marginBottom: '6px' }}>
+            TAF FORECAST
+          </div>
+          {decodedTAFPeriods.map((period, index) => {
+            const periodColor = period.flightCategory 
+              ? FlightCategoryColors[period.flightCategory] 
+              : '#888888';
+            
+            // Compact time format: "Dec 11 03:00-06:00"
+            const formatCompactTime = (date: Date) => {
+              const month = date.toLocaleString('en-US', { month: 'short' });
+              const day = date.getDate();
+              const hours = date.getHours().toString().padStart(2, '0');
+              const minutes = date.getMinutes().toString().padStart(2, '0');
+              return { month, day, time: `${hours}:${minutes}` };
+            };
+            
+            const from = formatCompactTime(period.validTimeFrom);
+            const to = formatCompactTime(period.validTimeTo);
+            const timeRange = from.day === to.day 
+              ? `${from.month} ${from.day} ${from.time}-${to.time}`
+              : `${from.month} ${from.day} ${from.time} - ${to.month} ${to.day} ${to.time}`;
+
+            // Determine status (current, future, past)
+            const now = new Date();
+            const isCurrent = now >= period.validTimeFrom && now <= period.validTimeTo;
+            const isFuture = now < period.validTimeFrom;
+            
+            let statusText = '';
+            let statusColor = '#888';
+            
+            if (isCurrent) {
+              statusText = 'CURRENT';
+              statusColor = '#00FF00'; // Green for current
+            } else if (isFuture) {
+              const diffMs = period.validTimeFrom.getTime() - now.getTime();
+              const diffHrs = Math.floor(diffMs / 3600000);
+              const diffMins = Math.floor((diffMs % 3600000) / 60000);
+              
+              if (diffHrs > 0) {
+                statusText = `in ${diffHrs}h ${diffMins}m`;
+              } else {
+                statusText = `in ${diffMins}m`;
+              }
+              statusColor = '#4A9EFF'; // Blue for future
+            }
+
+            return (
+              <div
+                key={index}
+                style={{
+                  marginTop: index > 0 ? '2px' : '0',
+                  padding: '4px 6px',
+                  backgroundColor: index % 2 === 0 ? '#1a1a1a' : '#222',
+                  borderLeft: `3px solid ${periodColor}`,
+                  fontFamily: 'monospace',
+                  fontSize: '10px',
+                  lineHeight: '1.4'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '2px' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                    <span style={{ 
+                      color: periodColor, 
+                      fontWeight: 'bold', 
+                      fontSize: '11px',
+                      minWidth: '40px'
+                    }}>
+                      {period.flightCategory || 'UNK'}
+                    </span>
+                    <span style={{ color: '#888', fontSize: '10px' }}>{timeRange}</span>
+                  </div>
+                  {statusText && (
+                    <span style={{ 
+                      color: statusColor, 
+                      fontWeight: 'bold', 
+                      fontSize: '10px',
+                      border: `1px solid ${statusColor}`,
+                      padding: '0 3px',
+                      borderRadius: '3px',
+                      marginLeft: '8px'
+                    }}>
+                      {statusText}
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                  {period.visibilityMi !== undefined && (
+                    <span style={{ backgroundColor: '#2a2a2a', padding: '1px 4px', borderRadius: '3px', color: '#ccc' }}>
+                      {period.visibilityMi.toFixed(1)}SM
+                    </span>
+                  )}
+                  {period.ceilingFt !== undefined && (
+                    <span style={{ backgroundColor: '#2a2a2a', padding: '1px 4px', borderRadius: '3px', color: '#ccc' }}>
+                      {period.ceilingFt}FT
+                    </span>
+                  )}
+                  {period.windSpeed !== undefined && (
+                    <span style={{ backgroundColor: '#2a2a2a', padding: '1px 4px', borderRadius: '3px', color: '#ccc' }}>
+                      {period.windDir !== undefined ? `${period.windDir.toString().padStart(3, '0')}°` : 'VRB'}@{period.windSpeed}KT
+                      {period.windGust ? `G${period.windGust}` : ''}
+                    </span>
+                  )}
+                  {period.clouds && period.clouds.length > 0 && period.clouds.map((cloud, i) => (
+                    <span key={`cloud-${i}`} style={{ backgroundColor: '#2a2a2a', padding: '1px 4px', borderRadius: '3px', color: '#ccc' }}>
+                      {cloud}
+                    </span>
+                  ))}
+                  {period.weather && period.weather.length > 0 && period.weather.map((wx, i) => (
+                    <span key={`wx-${i}`} style={{ backgroundColor: '#2a2a2a', padding: '1px 4px', borderRadius: '3px', color: '#ccc' }}>
+                      {wx}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* 7-Day Weather Forecast */}
       {weatherForecast && weatherForecast.length > 0 && (
         <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #444', width: 'fit-content' }}>
@@ -754,6 +883,7 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
               return (
                 <div
                   key={index}
+                  onClick={() => setSelectedForecast(forecast)}
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
@@ -769,7 +899,17 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
                     height: 'auto',
                     flexShrink: 0,
                     border: isToday ? '2px solid #4A9EFF' : 'none',
-                    boxShadow: isToday ? '0 0 8px rgba(74, 158, 255, 0.5)' : 'none'
+                    boxShadow: isToday ? '0 0 8px rgba(74, 158, 255, 0.5)' : 'none',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s ease, transform 0.1s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                    e.currentTarget.style.transform = 'scale(1.02)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                    e.currentTarget.style.transform = 'scale(1)';
                   }}
                 >
                   <div style={{ fontSize: '28px', marginBottom: '3px' }}>
@@ -785,7 +925,7 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
                     {forecast.temperatureMin}°{temperatureUnit}
                   </div>
                   <div style={{ fontSize: '9px', color: '#888888', marginBottom: forecast.precipitationProbability > 0 ? '2px' : '0' }}>
-                    {formatWind(forecast.windSpeedMax, forecast.windGustMax, forecast.windDirection)}
+                    {formatWind(forecast)}
                   </div>
                   {forecast.precipitationProbability > 0 && (
                     <div style={{ color: '#4A9EFF', fontSize: '9px', marginTop: 'auto' }}>
@@ -803,6 +943,139 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
         <div style={{ fontSize: '12px', color: '#aaaaaa', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #444' }}>
           Loading forecast...
         </div>
+      )}
+
+      {/* Weather Forecast Popup */}
+      {selectedForecast && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: 'rgba(26, 26, 26, 0.95)',
+            border: '1px solid #444',
+            borderRadius: '8px',
+            padding: '20px',
+            minWidth: '400px',
+            maxWidth: '600px',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            color: '#ffffff',
+            fontFamily: 'Arial, sans-serif',
+            zIndex: 2000,
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.7)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>
+              {formatDate(selectedForecast.date)} - Raw Weather Data
+            </h2>
+            <button
+              onClick={() => setSelectedForecast(null)}
+              style={{
+                backgroundColor: 'transparent',
+                color: '#ffffff',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                padding: '0',
+                width: '30px',
+                height: '30px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '4px',
+                transition: 'background-color 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              ×
+            </button>
+          </div>
+
+          <div style={{ fontSize: '14px', lineHeight: '1.8' }}>
+            <div style={{ marginBottom: '12px' }}>
+              <strong style={{ color: '#4A9EFF' }}>Weather:</strong>
+              <div style={{ marginLeft: '12px', marginTop: '4px' }}>
+                <span style={{ fontSize: '32px', marginRight: '8px' }}>{getWeatherIcon(selectedForecast.weatherCode)}</span>
+                <span>{getWeatherDescription(selectedForecast.weatherCode)}</span>
+                <span style={{ color: '#888', marginLeft: '8px' }}>(Code: {selectedForecast.weatherCode})</span>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <strong style={{ color: '#4A9EFF' }}>Temperature:</strong>
+              <div style={{ marginLeft: '12px', marginTop: '4px' }}>
+                High: {selectedForecast.temperatureMax}°{temperatureUnit}<br />
+                Low: {selectedForecast.temperatureMin}°{temperatureUnit}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <strong style={{ color: '#4A9EFF' }}>Wind:</strong>
+              <div style={{ marginLeft: '12px', marginTop: '4px', fontFamily: 'monospace' }}>
+                <div>Direction: {selectedForecast.windDirection}°</div>
+                <div>Speed (Avg): {kmhToKnots(selectedForecast.windSpeedAvg || selectedForecast.windSpeedMax).toFixed(1)} kt ({selectedForecast.windSpeedAvg || selectedForecast.windSpeedMax} km/h)</div>
+                <div>Speed (Max): {kmhToKnots(selectedForecast.windSpeedMax).toFixed(1)} kt ({selectedForecast.windSpeedMax} km/h)</div>
+                {selectedForecast.windGustAvg > 0 && (
+                  <>
+                    <div>Gusts (Avg): {kmhToKnots(selectedForecast.windGustAvg).toFixed(1)} kt ({selectedForecast.windGustAvg} km/h)</div>
+                    <div>Gusts (Max): {kmhToKnots(selectedForecast.windGustMax).toFixed(1)} kt ({selectedForecast.windGustMax} km/h)</div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <strong style={{ color: '#4A9EFF' }}>Precipitation:</strong>
+              <div style={{ marginLeft: '12px', marginTop: '4px' }}>
+                Probability: {selectedForecast.precipitationProbability}%
+              </div>
+            </div>
+
+            {selectedForecast.rawData && (
+              <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #444' }}>
+                <strong style={{ color: '#4A9EFF' }}>Raw API Data:</strong>
+                <pre style={{
+                  marginTop: '8px',
+                  padding: '12px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  fontFamily: 'monospace',
+                  overflowX: 'auto',
+                  color: '#cccccc',
+                  lineHeight: '1.6',
+                }}>
+                  {JSON.stringify(selectedForecast.rawData, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Backdrop for popup */}
+      {selectedForecast && (
+        <div
+          onClick={() => setSelectedForecast(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 1999,
+          }}
+        />
       )}
     </div>
   );

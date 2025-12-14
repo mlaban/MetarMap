@@ -94,7 +94,9 @@ export async function fetchWeatherForecast(
     const url = new URL(OPEN_METEO_API_URL);
     url.searchParams.set('latitude', latitude.toString());
     url.searchParams.set('longitude', longitude.toString());
+    // Fetch both daily and hourly data for better wind calculations
     url.searchParams.set('daily', 'weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max,windspeed_10m_max,windgusts_10m_max,winddirection_10m_dominant');
+    url.searchParams.set('hourly', 'windspeed_10m,windgusts_10m,winddirection_10m');
     url.searchParams.set('forecast_days', '7');
     url.searchParams.set('temperature_unit', temperatureUnit === 'F' ? 'fahrenheit' : 'celsius');
     url.searchParams.set('timezone', 'auto');
@@ -113,16 +115,74 @@ export async function fetchWeatherForecast(
       throw new Error('Invalid forecast data format');
     }
 
-    const forecasts: WeatherForecast[] = data.daily.time.map((date: string, index: number) => ({
-      date,
-      weatherCode: data.daily.weathercode[index],
-      temperatureMax: Math.round(data.daily.temperature_2m_max[index]),
-      temperatureMin: Math.round(data.daily.temperature_2m_min[index]),
-      precipitationProbability: data.daily.precipitation_probability_max[index] || 0,
-      windSpeedMax: Math.round(data.daily.windspeed_10m_max[index] || 0),
-      windGustMax: Math.round(data.daily.windgusts_10m_max[index] || 0),
-      windDirection: Math.round(data.daily.winddirection_10m_dominant[index] || 0),
-    }));
+    const forecasts: WeatherForecast[] = data.daily.time.map((date: string, index: number) => {
+      // Calculate average wind speeds from hourly data for more realistic values
+      let windSpeedAvg = data.daily.windspeed_10m_max[index] || 0;
+      let windGustAvg = data.daily.windgusts_10m_max[index] || 0;
+      
+      if (data.hourly && data.hourly.time && data.hourly.windspeed_10m) {
+        // Find hourly data for this day
+        const targetDate = new Date(date);
+        const targetDateStr = targetDate.toISOString().split('T')[0]; // Get YYYY-MM-DD format
+        
+        const hourlyForDay: number[] = [];
+        const gustForDay: number[] = [];
+        
+        data.hourly.time.forEach((hourTime: string, hourIndex: number) => {
+          const hourDate = new Date(hourTime);
+          const hourDateStr = hourDate.toISOString().split('T')[0];
+          
+          // Match dates (ignoring time)
+          if (hourDateStr === targetDateStr) {
+            const windSpeed = data.hourly.windspeed_10m[hourIndex];
+            if (windSpeed !== null && windSpeed !== undefined && !isNaN(windSpeed)) {
+              hourlyForDay.push(windSpeed);
+            }
+            
+            if (data.hourly.windgusts_10m) {
+              const windGust = data.hourly.windgusts_10m[hourIndex];
+              if (windGust !== null && windGust !== undefined && !isNaN(windGust)) {
+                gustForDay.push(windGust);
+              }
+            }
+          }
+        });
+        
+        // Calculate average (more representative than max)
+        if (hourlyForDay.length > 0) {
+          const sum = hourlyForDay.reduce((a, b) => a + b, 0);
+          windSpeedAvg = sum / hourlyForDay.length;
+        }
+        if (gustForDay.length > 0) {
+          const sum = gustForDay.reduce((a, b) => a + b, 0);
+          windGustAvg = sum / gustForDay.length;
+        }
+      }
+
+      return {
+        date,
+        weatherCode: data.daily.weathercode[index],
+        temperatureMax: Math.round(data.daily.temperature_2m_max[index]),
+        temperatureMin: Math.round(data.daily.temperature_2m_min[index]),
+        precipitationProbability: data.daily.precipitation_probability_max[index] || 0,
+        windSpeedMax: Math.round(data.daily.windspeed_10m_max[index] || 0), // Keep max for reference
+        windGustMax: Math.round(data.daily.windgusts_10m_max[index] || 0), // Keep max for reference
+        windSpeedAvg: Math.round(windSpeedAvg), // Average wind speed (more realistic)
+        windGustAvg: Math.round(windGustAvg), // Average gust speed (more realistic)
+        windDirection: Math.round(data.daily.winddirection_10m_dominant[index] || 0),
+        rawData: {
+          daily: {
+            weathercode: data.daily.weathercode[index],
+            temperature_2m_max: data.daily.temperature_2m_max[index],
+            temperature_2m_min: data.daily.temperature_2m_min[index],
+            precipitation_probability_max: data.daily.precipitation_probability_max[index] || 0,
+            windspeed_10m_max: data.daily.windspeed_10m_max[index] || 0,
+            windgusts_10m_max: data.daily.windgusts_10m_max[index] || 0,
+            winddirection_10m_dominant: data.daily.winddirection_10m_dominant[index] || 0,
+          }
+        }
+      };
+    });
 
 
 

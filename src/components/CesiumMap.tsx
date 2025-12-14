@@ -33,7 +33,6 @@ export default function CesiumMap({
     const dataSourcesRef = useRef<Cesium.CustomDataSource | null>(null);
     const radarLayerRef = useRef<Cesium.ImageryLayer | null>(null);
     const satelliteLayerRef = useRef<Cesium.ImageryLayer | null>(null);
-    const [showWinds, setShowWinds] = useState(false);
 
     // Helper to create glowing dot image
     const getGlowImage = (colorCss: string) => {
@@ -143,22 +142,34 @@ export default function CesiumMap({
         const viewer = viewerRef.current;
         if (!viewer) return;
 
-        if (showRadar) {
-            if (!radarLayerRef.current) {
+        const updateRadar = () => {
+            // Remove existing layer first
+            if (radarLayerRef.current) {
+                viewer.imageryLayers.remove(radarLayerRef.current);
+                radarLayerRef.current = null;
+            }
+
+            if (showRadar) {
+                // Use Iowa State Mesonet NEXRAD - reliable and covers US
+                // RainViewer is disabled due to DNS resolution issues
                 const provider = new Cesium.UrlTemplateImageryProvider({
                     url: 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0r-900913/{z}/{x}/{y}.png',
                     credit: 'NOAA NEXRAD via Iowa State Mesonet',
                     maximumLevel: 10,
                 });
+
+                // Suppress error events to prevent console spam from failed tile loads
+                provider.errorEvent.addEventListener(() => {
+                    // Silently handle tile load failures - this is expected behavior
+                    // when tiles don't exist or are outside coverage area
+                });
+
                 radarLayerRef.current = viewer.imageryLayers.addImageryProvider(provider);
                 radarLayerRef.current.alpha = 0.6;
             }
-        } else {
-            if (radarLayerRef.current) {
-                viewer.imageryLayers.remove(radarLayerRef.current);
-                radarLayerRef.current = null;
-            }
-        }
+        };
+
+        updateRadar();
     }, [showRadar]);
 
     // Update Satellite Layer
@@ -183,18 +194,6 @@ export default function CesiumMap({
             }
         }
     }, [showSatellite]);
-
-    // Toggle winds
-    useEffect(() => {
-        if (!windToggleEnabled) {
-            setShowWinds(false);
-            return;
-        }
-        const interval = setInterval(() => {
-            setShowWinds(prev => !prev);
-        }, 3000);
-        return () => clearInterval(interval);
-    }, [windToggleEnabled]);
 
     // Update Airport Markers
     useEffect(() => {
@@ -242,17 +241,8 @@ export default function CesiumMap({
         </div>
       `;
 
-            // Label text
-            let labelText = airport.icao;
-            if (windToggleEnabled && showWinds && metar) {
-                const windGust = metar.wgst || (metar as any).windGustKt;
-                const maxWind = Math.max(windSpeed || 0, windGust || 0);
-                if (maxWind > 30) {
-                    labelText = `${Math.round(windSpeed || 0)}G${Math.round(windGust || 0)}KT`;
-                } else if ((windSpeed || 0) > 0) {
-                    labelText = `${Math.round(windSpeed || 0)}KT`;
-                }
-            }
+            // Label text - always show ICAO
+            const labelText = airport.icao;
 
             // Add entity
             dataSource.entities.add({
@@ -281,7 +271,7 @@ export default function CesiumMap({
             });
         });
 
-    }, [airportMETARs, showAirportLabels, showWinds, windToggleEnabled]);
+    }, [airportMETARs, showAirportLabels]);
 
     // Auto-move logic
     useEffect(() => {
