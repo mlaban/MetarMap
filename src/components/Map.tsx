@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { AirportMETAR, fetchSingleAirport } from '../services/metarService';
 import { FlightCategoryColors, FlightCategory } from '../types/flightCategory';
 import { getNextTAFCondition, decodeTAFPeriods } from '../utils/tafParser';
+import { RadarSource } from '../types/radar';
 
 interface MapProps {
   airportMETARs: AirportMETAR[];
@@ -12,11 +13,12 @@ interface MapProps {
   windToggleEnabled: boolean;
   showAirportLabels: boolean;
   showRadar: boolean;
+  radarSource?: RadarSource;
   showSatellite: boolean;
   onRefreshAirport?: (icao: string) => Promise<void>;
 }
 
-export default function Map({ airportMETARs, center, zoom, windToggleEnabled, showAirportLabels, showRadar, showSatellite, onRefreshAirport }: MapProps) {
+export default function Map({ airportMETARs, center, zoom, windToggleEnabled, showAirportLabels, showRadar, radarSource = RadarSource.IOWA_NEXRAD_N0Q, showSatellite, onRefreshAirport }: MapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.CircleMarker[]>([]);
   const coreMarkersRef = useRef<L.CircleMarker[]>([]);
@@ -73,23 +75,6 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
     };
   }, []);
 
-  // Function to fetch latest RainViewer timestamp
-  const fetchRainViewerTimestamp = async (): Promise<number | null> => {
-    try {
-      const response = await fetch('https://api.rainviewer.com/public/weather-maps.json');
-      if (!response.ok) return null;
-      const data = await response.json();
-      if (data && data.radar && data.radar.past && data.radar.past.length > 0) {
-        // Get the last timestamp from the 'past' array (most recent actual radar data)
-        return data.radar.past[data.radar.past.length - 1].time;
-      }
-      return null;
-    } catch (error) {
-      console.error('Failed to fetch RainViewer timestamp:', error);
-      return null;
-    }
-  };
-
   // Initialize and update radar layer when visibility changes
   useEffect(() => {
     if (!mapRef.current) return;
@@ -102,38 +87,28 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
       }
 
       if (showRadar) {
-        // Fetch latest timestamp for RainViewer
-        const ts = await fetchRainViewerTimestamp();
-        
-        if (mapRef.current) { // Check if map is still mounted
-          if (ts) {
-            // Use RainViewer (Global coverage, better composite)
-            // URL format: https://tile.rainviewer.com/{ts}/{size}/{z}/{x}/{y}/{color}/{options}.png
-            // Color 2 = Universal Blue
-            // Options 1_1 = Smoothing on, Snow mask on
-            radarLayerRef.current = L.tileLayer(`https://tile.rainviewer.com/${ts}/256/{z}/{x}/{y}/2/1_1.png`, {
-              attribution: 'Radar data &copy; <a href="https://www.rainviewer.com/api.html">RainViewer</a>',
-              opacity: 0.6,
-              maxZoom: 18,
-              zIndex: 100
-            });
-          } else {
-            // Fallback to Iowa State Mesonet (US only) if RainViewer fails
-            radarLayerRef.current = L.tileLayer('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0r-900913/{z}/{x}/{y}.png', {
+        // Fallback or explicit choice: Iowa State Mesonet (US only)
+        if (mapRef.current) {
+            let layerUrl = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png'; // Default to High Res
+            
+            if (radarSource === RadarSource.IOWA_NEXRAD_N0R) {
+              layerUrl = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0r-900913/{z}/{x}/{y}.png';
+            }
+
+            radarLayerRef.current = L.tileLayer(layerUrl, {
               attribution: 'NOAA NEXRAD via Iowa State Mesonet',
-              opacity: 0.6,
+              opacity: 0.25,
               maxZoom: 10,
               zIndex: 100
             });
-          }
-          
-          radarLayerRef.current.addTo(mapRef.current);
+            
+            radarLayerRef.current.addTo(mapRef.current);
         }
       }
     };
 
     updateRadar();
-  }, [showRadar]);
+  }, [showRadar, radarSource]);
 
   // Satellite layer disabled - tiles not working properly (showing all green)
   // TODO: Re-enable when a working satellite tile service is found

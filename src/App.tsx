@@ -7,6 +7,7 @@ import { fetchMETARs } from './services/metarService';
 import { AirportMETAR } from './services/metarService';
 import { FlightCategory } from './types/flightCategory';
 import { AIRPORTS } from './data/airports';
+import { RadarSource } from './types/radar';
 
 // Northeast region coordinates (centered on the region)
 const NY_CENTER: [number, number] = [41.5, -73.0];
@@ -23,6 +24,7 @@ function App() {
   const [windToggleEnabled, setWindToggleEnabled] = useState(true);
   const [showAirportLabels, setShowAirportLabels] = useState(true);
   const [showRadar, setShowRadar] = useState(false);
+  const [radarSource, setRadarSource] = useState<RadarSource>(RadarSource.IOWA_NEXRAD_N0Q);
   const [showSatellite, setShowSatellite] = useState(false);
   const [autoMoveEnabled, setAutoMoveEnabled] = useState(false);
   const lastRefreshTimeRef = useRef<number>(0);
@@ -117,6 +119,7 @@ function App() {
         windToggleEnabled={windToggleEnabled}
         showAirportLabels={showAirportLabels}
         showRadar={showRadar}
+        radarSource={radarSource}
         showSatellite={showSatellite}
         autoMoveEnabled={autoMoveEnabled}
         onRefreshAirport={async (icao: string) => {
@@ -150,6 +153,8 @@ function App() {
         onShowAirportLabelsChange={setShowAirportLabels}
         showRadar={showRadar}
         onShowRadarChange={setShowRadar}
+        radarSource={radarSource}
+        onRadarSourceChange={setRadarSource}
         showSatellite={showSatellite}
         onShowSatelliteChange={setShowSatellite}
         autoMoveEnabled={autoMoveEnabled}

@@ -1,4 +1,5 @@
 import { FlightCategory, FlightCategoryColors } from '../types/flightCategory';
+import { RadarSource, RadarSourceLabels } from '../types/radar';
 
 interface StatusBarProps {
   lastUpdate: Date | null;
@@ -9,6 +10,8 @@ interface StatusBarProps {
   onShowAirportLabelsChange: (show: boolean) => void;
   showRadar: boolean;
   onShowRadarChange: (show: boolean) => void;
+  radarSource: RadarSource;
+  onRadarSourceChange: (source: RadarSource) => void;
   showSatellite: boolean;
   onShowSatelliteChange: (show: boolean) => void;
   autoMoveEnabled: boolean;
@@ -84,7 +87,7 @@ const BlinkingLegendDot = ({ color, label }: { color: string; label: string }) =
   );
 };
 
-export default function StatusBar({ lastUpdate, isRefreshing, windToggleEnabled, onWindToggleChange, showAirportLabels, onShowAirportLabelsChange, showRadar, onShowRadarChange, showSatellite, onShowSatelliteChange, autoMoveEnabled, onAutoMoveChange }: StatusBarProps) {
+export default function StatusBar({ lastUpdate, isRefreshing, windToggleEnabled, onWindToggleChange, showAirportLabels, onShowAirportLabelsChange, showRadar, onShowRadarChange, radarSource, onRadarSourceChange, showSatellite, onShowSatelliteChange, autoMoveEnabled, onAutoMoveChange }: StatusBarProps) {
   return (
     <div style={{
       position: 'absolute',
@@ -157,20 +160,42 @@ export default function StatusBar({ lastUpdate, isRefreshing, windToggleEnabled,
             />
             <span style={{ color: '#cccccc' }}>Show Labels</span>
           </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>
-            <input
-              type="checkbox"
-              checked={showRadar}
-              onChange={(e) => onShowRadarChange(e.target.checked)}
-              style={{
-                width: '16px',
-                height: '16px',
-                cursor: 'pointer',
-                accentColor: '#4CAF50'
-              }}
-            />
-            <span style={{ color: '#cccccc' }}>Radar</span>
-          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>
+              <input
+                type="checkbox"
+                checked={showRadar}
+                onChange={(e) => onShowRadarChange(e.target.checked)}
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  cursor: 'pointer',
+                  accentColor: '#4CAF50'
+                }}
+              />
+              <span style={{ color: '#cccccc' }}>Radar</span>
+            </label>
+            {showRadar && (
+              <select
+                value={radarSource}
+                onChange={(e) => onRadarSourceChange(e.target.value as RadarSource)}
+                style={{
+                  backgroundColor: '#333',
+                  color: '#fff',
+                  border: '1px solid #555',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  padding: '2px 4px',
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                {Object.entries(RadarSourceLabels).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            )}
+          </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>
             <input
               type="checkbox"

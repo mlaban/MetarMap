@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as Cesium from 'cesium';
 import { AirportMETAR } from '../services/metarService';
 import { FlightCategoryColors, FlightCategory } from '../types/flightCategory';
+import { RadarSource } from '../types/radar';
 
 // Import Cesium CSS
 import 'cesium/Build/Cesium/Widgets/widgets.css';
@@ -13,6 +14,7 @@ interface CesiumMapProps {
     windToggleEnabled: boolean;
     showAirportLabels: boolean;
     showRadar: boolean;
+    radarSource?: RadarSource;
     showSatellite: boolean;
     autoMoveEnabled: boolean;
     onRefreshAirport?: (icao: string) => Promise<void>;
@@ -25,6 +27,7 @@ export default function CesiumMap({
     windToggleEnabled,
     showAirportLabels,
     showRadar,
+    radarSource = RadarSource.IOWA_NEXRAD_N0Q,
     showSatellite,
     autoMoveEnabled
 }: CesiumMapProps) {
@@ -142,7 +145,7 @@ export default function CesiumMap({
         const viewer = viewerRef.current;
         if (!viewer) return;
 
-        const updateRadar = () => {
+        const updateRadar = async () => {
             // Remove existing layer first
             if (radarLayerRef.current) {
                 viewer.imageryLayers.remove(radarLayerRef.current);
@@ -150,10 +153,16 @@ export default function CesiumMap({
             }
 
             if (showRadar) {
-                // Use Iowa State Mesonet NEXRAD - reliable and covers US
-                // RainViewer is disabled due to DNS resolution issues
+                // Iowa State Mesonet NEXRAD
+                // Reliable and covers US
+                let layerUrl = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png'; // Default to High Res
+                
+                if (radarSource === RadarSource.IOWA_NEXRAD_N0R) {
+                   layerUrl = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0r-900913/{z}/{x}/{y}.png';
+                }
+
                 const provider = new Cesium.UrlTemplateImageryProvider({
-                    url: 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0r-900913/{z}/{x}/{y}.png',
+                    url: layerUrl,
                     credit: 'NOAA NEXRAD via Iowa State Mesonet',
                     maximumLevel: 10,
                 });
@@ -165,12 +174,12 @@ export default function CesiumMap({
                 });
 
                 radarLayerRef.current = viewer.imageryLayers.addImageryProvider(provider);
-                radarLayerRef.current.alpha = 0.6;
+                radarLayerRef.current.alpha = 0.25;
             }
         };
 
         updateRadar();
-    }, [showRadar]);
+    }, [showRadar, radarSource]);
 
     // Update Satellite Layer
     useEffect(() => {
