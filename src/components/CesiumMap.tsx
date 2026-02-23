@@ -3,6 +3,7 @@ import * as Cesium from 'cesium';
 import { AirportMETAR } from '../services/metarService';
 import { FlightCategoryColors, FlightCategory } from '../types/flightCategory';
 import { RadarSource } from '../types/radar';
+import { ChartSource, ChartSourceUrls } from '../types/charts';
 
 // Import Cesium CSS
 import 'cesium/Build/Cesium/Widgets/widgets.css';
@@ -16,6 +17,8 @@ interface CesiumMapProps {
     showRadar: boolean;
     radarSource?: RadarSource;
     showSatellite: boolean;
+    showCharts: boolean;
+    chartSource?: ChartSource;
     autoMoveEnabled: boolean;
     onRefreshAirport?: (icao: string) => Promise<void>;
 }
@@ -29,6 +32,8 @@ export default function CesiumMap({
     showRadar,
     radarSource = RadarSource.IOWA_NEXRAD_N0Q,
     showSatellite,
+    showCharts,
+    chartSource = ChartSource.VFR_SECTIONAL,
     autoMoveEnabled
 }: CesiumMapProps) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -36,6 +41,7 @@ export default function CesiumMap({
     const dataSourcesRef = useRef<Cesium.CustomDataSource | null>(null);
     const radarLayerRef = useRef<Cesium.ImageryLayer | null>(null);
     const satelliteLayerRef = useRef<Cesium.ImageryLayer | null>(null);
+    const chartLayerRef = useRef<Cesium.ImageryLayer | null>(null);
 
     // Helper to create glowing dot image
     const getGlowImage = (colorCss: string) => {
@@ -203,6 +209,38 @@ export default function CesiumMap({
             }
         }
     }, [showSatellite]);
+
+    // Update Chart Layer
+    useEffect(() => {
+        const viewer = viewerRef.current;
+        if (!viewer) return;
+
+        const updateCharts = async () => {
+            // Remove existing chart layer
+            if (chartLayerRef.current) {
+                viewer.imageryLayers.remove(chartLayerRef.current);
+                chartLayerRef.current = null;
+            }
+
+            if (showCharts) {
+                const chartUrl = ChartSourceUrls[chartSource];
+
+                try {
+                    const provider = await Cesium.ArcGisMapServerImageryProvider.fromUrl(chartUrl);
+
+                    // Check if viewer was destroyed while awaiting
+                    if (!viewerRef.current) return;
+
+                    chartLayerRef.current = viewer.imageryLayers.addImageryProvider(provider);
+                    chartLayerRef.current.alpha = 0.7;
+                } catch (e) {
+                    // Silently handle failures - chart tiles may not be available in all areas
+                }
+            }
+        };
+
+        updateCharts();
+    }, [showCharts, chartSource]);
 
     // Update Airport Markers
     useEffect(() => {

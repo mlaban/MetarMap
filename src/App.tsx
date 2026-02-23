@@ -8,6 +8,7 @@ import { AirportMETAR } from './services/metarService';
 import { FlightCategory } from './types/flightCategory';
 import { AIRPORTS } from './data/airports';
 import { RadarSource } from './types/radar';
+import { ChartSource } from './types/charts';
 
 // Northeast region coordinates (centered on the region)
 const NY_CENTER: [number, number] = [41.5, -73.0];
@@ -26,6 +27,8 @@ function App() {
   const [showRadar, setShowRadar] = useState(false);
   const [radarSource, setRadarSource] = useState<RadarSource>(RadarSource.IOWA_NEXRAD_N0Q);
   const [showSatellite, setShowSatellite] = useState(false);
+  const [showCharts, setShowCharts] = useState(false);
+  const [chartSource, setChartSource] = useState<ChartSource>(ChartSource.VFR_SECTIONAL);
   const [autoMoveEnabled, setAutoMoveEnabled] = useState(false);
   const lastRefreshTimeRef = useRef<number>(0);
 
@@ -121,6 +124,8 @@ function App() {
         showRadar={showRadar}
         radarSource={radarSource}
         showSatellite={showSatellite}
+        showCharts={showCharts}
+        chartSource={chartSource}
         autoMoveEnabled={autoMoveEnabled}
         onRefreshAirport={async (icao: string) => {
           // Check rate limit before allowing individual airport refresh
@@ -157,6 +162,10 @@ function App() {
         onRadarSourceChange={setRadarSource}
         showSatellite={showSatellite}
         onShowSatelliteChange={setShowSatellite}
+        showCharts={showCharts}
+        onShowChartsChange={setShowCharts}
+        chartSource={chartSource}
+        onChartSourceChange={setChartSource}
         autoMoveEnabled={autoMoveEnabled}
         onAutoMoveChange={setAutoMoveEnabled}
       />
