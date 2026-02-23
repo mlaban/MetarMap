@@ -1,5 +1,6 @@
 import { FlightCategory, FlightCategoryColors } from '../types/flightCategory';
 import { RadarSource, RadarSourceLabels } from '../types/radar';
+import { ChartSource, ChartSourceLabels } from '../types/charts';
 
 interface StatusBarProps {
   lastUpdate: Date | null;
@@ -14,6 +15,10 @@ interface StatusBarProps {
   onRadarSourceChange: (source: RadarSource) => void;
   showSatellite: boolean;
   onShowSatelliteChange: (show: boolean) => void;
+  showCharts: boolean;
+  onShowChartsChange: (show: boolean) => void;
+  chartSource: ChartSource;
+  onChartSourceChange: (source: ChartSource) => void;
   autoMoveEnabled: boolean;
   onAutoMoveChange: (enabled: boolean) => void;
 }
@@ -87,7 +92,7 @@ const BlinkingLegendDot = ({ color, label }: { color: string; label: string }) =
   );
 };
 
-export default function StatusBar({ lastUpdate, isRefreshing, windToggleEnabled, onWindToggleChange, showAirportLabels, onShowAirportLabelsChange, showRadar, onShowRadarChange, radarSource, onRadarSourceChange, showSatellite, onShowSatelliteChange, autoMoveEnabled, onAutoMoveChange }: StatusBarProps) {
+export default function StatusBar({ lastUpdate, isRefreshing, windToggleEnabled, onWindToggleChange, showAirportLabels, onShowAirportLabelsChange, showRadar, onShowRadarChange, radarSource, onRadarSourceChange, showSatellite, onShowSatelliteChange, showCharts, onShowChartsChange, chartSource, onChartSourceChange, autoMoveEnabled, onAutoMoveChange }: StatusBarProps) {
   return (
     <div style={{
       position: 'absolute',
@@ -191,6 +196,42 @@ export default function StatusBar({ lastUpdate, isRefreshing, windToggleEnabled,
                 }}
               >
                 {Object.entries(RadarSourceLabels).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>
+              <input
+                type="checkbox"
+                checked={showCharts}
+                onChange={(e) => onShowChartsChange(e.target.checked)}
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  cursor: 'pointer',
+                  accentColor: '#4CAF50'
+                }}
+              />
+              <span style={{ color: '#cccccc' }}>Charts</span>
+            </label>
+            {showCharts && (
+              <select
+                value={chartSource}
+                onChange={(e) => onChartSourceChange(e.target.value as ChartSource)}
+                style={{
+                  backgroundColor: '#333',
+                  color: '#fff',
+                  border: '1px solid #555',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  padding: '2px 4px',
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                {Object.entries(ChartSourceLabels).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
                 ))}
               </select>
