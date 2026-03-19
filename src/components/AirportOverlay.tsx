@@ -15,7 +15,7 @@ const STORAGE_KEY = 'favoriteAirportIcao';
 const POSITION_STORAGE_KEY = 'airportOverlayPosition';
 const TEMP_UNIT_STORAGE_KEY = 'temperatureUnit';
 
-export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOverlayProps) {
+export default function AirportOverlay({ airportMETARs }: AirportOverlayProps) {
   const [favoriteIcao, setFavoriteIcao] = useState<string>(() => {
     // Load from localStorage on mount
     return localStorage.getItem(STORAGE_KEY) || '';
@@ -67,7 +67,7 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
     try {
       const forecast = await fetchWeatherForecast(latitude, longitude, temperatureUnit);
       setWeatherForecast(forecast.forecasts);
-    } catch (err) {
+    } catch {
 
       setWeatherForecast(null);
     } finally {
@@ -112,7 +112,7 @@ export default function AirportOverlay({ airportMETARs, onRefresh }: AirportOver
           loadForecast(data.airport.latitude, data.airport.longitude);
         }
       })
-      .catch(err => {
+      .catch(() => {
 
         setError('Failed to load airport data');
         setAirportData(null);

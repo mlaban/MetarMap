@@ -1,4 +1,4 @@
-* {
+﻿* {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -78,3 +78,17 @@ body {
   background-color: #000000;
 }
 
+.leaflet-vfr-sectional-layer,
+.leaflet-vfr-sectional-layer img {
+  image-rendering: auto;
+  image-rendering: smooth;
+  -ms-interpolation-mode: bicubic;
+}
+
+.leaflet-vfr-sectional-layer img {
+  filter: brightness(1) invert(0);
+}
+
+.leaflet-vfr-sectional-layer.leaflet-vfr-sectional-darken img {
+  filter: brightness(0.72) contrast(0.96) invert(0);
+}

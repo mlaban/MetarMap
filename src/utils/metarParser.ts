@@ -10,9 +10,6 @@ import { METAR } from '../types/metar';
  * - VFR: Ceiling >= 3000 ft AGL and visibility >= 5 miles
  */
 export function parseFlightCategory(metar: METAR): FlightCategory {
-  const stationId = metar.icaoId || metar.stationId || 'UNKNOWN';
-
-
   // Check for fltCat field from API first (most reliable)
   if (metar.fltCat) {
     const apiCategory = metar.fltCat.toUpperCase();

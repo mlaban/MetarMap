@@ -1,8 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef } from 'react';
 import * as Cesium from 'cesium';
 import { AirportMETAR } from '../services/metarService';
 import { FlightCategoryColors, FlightCategory } from '../types/flightCategory';
 import { RadarSource } from '../types/radar';
+import {
+    VFR_SECTIONAL_ATTRIBUTION,
+    VFR_SECTIONAL_MAX_NATIVE_ZOOM,
+    VFR_SECTIONAL_OPACITY,
+    VFR_SECTIONAL_TILE_URL,
+} from '../constants/mapLayers';
 
 // Import Cesium CSS
 import 'cesium/Build/Cesium/Widgets/widgets.css';
@@ -15,6 +21,8 @@ interface CesiumMapProps {
     showAirportLabels: boolean;
     showRadar: boolean;
     radarSource?: RadarSource;
+    showVfrSectionals: boolean;
+    darkenSectionalCharts: boolean;
     showSatellite: boolean;
     autoMoveEnabled: boolean;
     onRefreshAirport?: (icao: string) => Promise<void>;
@@ -24,10 +32,11 @@ export default function CesiumMap({
     airportMETARs,
     center,
     zoom,
-    windToggleEnabled,
     showAirportLabels,
     showRadar,
     radarSource = RadarSource.IOWA_NEXRAD_N0Q,
+    showVfrSectionals,
+    darkenSectionalCharts,
     showSatellite,
     autoMoveEnabled
 }: CesiumMapProps) {
@@ -35,6 +44,7 @@ export default function CesiumMap({
     const viewerRef = useRef<Cesium.Viewer | null>(null);
     const dataSourcesRef = useRef<Cesium.CustomDataSource | null>(null);
     const radarLayerRef = useRef<Cesium.ImageryLayer | null>(null);
+    const vfrSectionalLayerRef = useRef<Cesium.ImageryLayer | null>(null);
     const satelliteLayerRef = useRef<Cesium.ImageryLayer | null>(null);
 
     // Helper to create glowing dot image
@@ -101,11 +111,13 @@ export default function CesiumMap({
             navigationInstructionsInitiallyVisible: false,
             scene3DOnly: false,
             shouldAnimate: true,
+            useBrowserRecommendedResolution: false,
         });
 
         // Enable clock for smooth interpolation
         viewer.clock.shouldAnimate = true;
         viewer.clock.multiplier = 1.0;
+        viewer.scene.postProcessStages.fxaa.enabled = true;
 
         // Remove default imagery and add Dark Matter
         viewer.imageryLayers.removeAll();
@@ -180,6 +192,33 @@ export default function CesiumMap({
 
         updateRadar();
     }, [showRadar, radarSource]);
+
+    // Update VFR Sectional Layer
+    useEffect(() => {
+        const viewer = viewerRef.current;
+        if (!viewer) return;
+
+        if (vfrSectionalLayerRef.current) {
+            viewer.imageryLayers.remove(vfrSectionalLayerRef.current);
+            vfrSectionalLayerRef.current = null;
+        }
+
+        if (showVfrSectionals) {
+            const provider = new Cesium.UrlTemplateImageryProvider({
+                url: VFR_SECTIONAL_TILE_URL,
+                credit: VFR_SECTIONAL_ATTRIBUTION,
+                maximumLevel: VFR_SECTIONAL_MAX_NATIVE_ZOOM,
+            });
+
+            // Insert above the basemap but below any weather overlays.
+            vfrSectionalLayerRef.current = viewer.imageryLayers.addImageryProvider(provider, 1);
+            vfrSectionalLayerRef.current.alpha = VFR_SECTIONAL_OPACITY;
+            vfrSectionalLayerRef.current.brightness = darkenSectionalCharts ? 0.7 : 1.0;
+            vfrSectionalLayerRef.current.contrast = darkenSectionalCharts ? 0.95 : 1.0;
+            vfrSectionalLayerRef.current.minificationFilter = Cesium.TextureMinificationFilter.LINEAR;
+            vfrSectionalLayerRef.current.magnificationFilter = Cesium.TextureMagnificationFilter.LINEAR;
+        }
+    }, [showVfrSectionals, darkenSectionalCharts]);
 
     // Update Satellite Layer
     useEffect(() => {

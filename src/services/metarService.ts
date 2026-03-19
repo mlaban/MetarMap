@@ -46,7 +46,7 @@ async function fetchTAFs(airports: Airport[]): Promise<Map<string, TAF>> {
 
 
     if (!response.ok) {
-      const errorText = await response.text();
+      await response.text();
 
       return tafMap;
     }
@@ -98,7 +98,7 @@ export async function fetchMETARs(airports: Airport[]): Promise<AirportMETAR[]> 
 
 
     if (!metarResponse.ok) {
-      const errorText = await metarResponse.text();
+      await metarResponse.text();
 
       throw new Error(`Failed to fetch METARs: ${metarResponse.statusText} (${metarResponse.status})`);
     }

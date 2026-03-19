@@ -1,13 +1,14 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import CesiumMap from './components/CesiumMap';
+import Map from './components/Map';
 import LoadingSpinner from './components/LoadingSpinner';
 import StatusBar from './components/StatusBar';
 import AirportOverlay from './components/AirportOverlay';
 import { fetchMETARs } from './services/metarService';
 import { AirportMETAR } from './services/metarService';
-import { FlightCategory } from './types/flightCategory';
 import { AIRPORTS } from './data/airports';
 import { RadarSource } from './types/radar';
+import { MapRenderer } from './types/mapRenderer';
 
 // Northeast region coordinates (centered on the region)
 const NY_CENTER: [number, number] = [41.5, -73.0];
@@ -25,7 +26,10 @@ function App() {
   const [showAirportLabels, setShowAirportLabels] = useState(true);
   const [showRadar, setShowRadar] = useState(false);
   const [radarSource, setRadarSource] = useState<RadarSource>(RadarSource.IOWA_NEXRAD_N0Q);
+  const [showVfrSectionals, setShowVfrSectionals] = useState(false);
+  const [darkenSectionalCharts, setDarkenSectionalCharts] = useState(false);
   const [showSatellite, setShowSatellite] = useState(false);
+  const [mapRenderer, setMapRenderer] = useState<MapRenderer>(MapRenderer.LEAFLET);
   const [autoMoveEnabled, setAutoMoveEnabled] = useState(false);
   const lastRefreshTimeRef = useRef<number>(0);
 
@@ -35,8 +39,6 @@ function App() {
     const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
 
     if (isRefresh && !forceRefresh && timeSinceLastRefresh < REFRESH_INTERVAL_MS) {
-      const remainingSeconds = Math.ceil((REFRESH_INTERVAL_MS - timeSinceLastRefresh) / 1000);
-
       return;
     }
 
@@ -91,7 +93,33 @@ function App() {
     };
   }, [loadWeatherData]);
 
+  useEffect(() => {
+    if (mapRenderer !== MapRenderer.CESIUM && autoMoveEnabled) {
+      setAutoMoveEnabled(false);
+    }
+  }, [mapRenderer, autoMoveEnabled]);
 
+
+
+  const handleRefreshAirport = async (icao: string) => {
+    // Check rate limit before allowing individual airport refresh
+    const now = Date.now();
+    const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
+
+    if (timeSinceLastRefresh < REFRESH_INTERVAL_MS) {
+      return;
+    }
+
+    const airport = AIRPORTS.find(a => a.icao === icao);
+    if (airport) {
+      const { fetchSingleAirport } = await import('./services/metarService');
+      const updatedData = await fetchSingleAirport(airport);
+      setAirportMETARs(prev => prev.map(am =>
+        am.airport.icao === icao ? updatedData : am
+      ));
+      lastRefreshTimeRef.current = now;
+    }
+  };
 
   return (
     <div style={{ width: '100vw', height: '100vh', margin: 0, padding: 0, overflow: 'hidden', backgroundColor: '#000000' }}>
@@ -112,38 +140,38 @@ function App() {
           Error: {error}
         </div>
       )}
-      <CesiumMap
-        airportMETARs={airportMETARs}
-        center={NY_CENTER}
-        zoom={NY_ZOOM}
-        windToggleEnabled={windToggleEnabled}
-        showAirportLabels={showAirportLabels}
-        showRadar={showRadar}
-        radarSource={radarSource}
-        showSatellite={showSatellite}
-        autoMoveEnabled={autoMoveEnabled}
-        onRefreshAirport={async (icao: string) => {
-          // Check rate limit before allowing individual airport refresh
-          const now = Date.now();
-          const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
-
-          if (timeSinceLastRefresh < REFRESH_INTERVAL_MS) {
-            const remainingSeconds = Math.ceil((REFRESH_INTERVAL_MS - timeSinceLastRefresh) / 1000);
-
-            return;
-          }
-
-          const airport = AIRPORTS.find(a => a.icao === icao);
-          if (airport) {
-            const { fetchSingleAirport } = await import('./services/metarService');
-            const updatedData = await fetchSingleAirport(airport);
-            setAirportMETARs(prev => prev.map(am =>
-              am.airport.icao === icao ? updatedData : am
-            ));
-            lastRefreshTimeRef.current = now;
-          }
-        }}
-      />
+      {mapRenderer === MapRenderer.CESIUM ? (
+        <CesiumMap
+          key={MapRenderer.CESIUM}
+          airportMETARs={airportMETARs}
+          center={NY_CENTER}
+          zoom={NY_ZOOM}
+          windToggleEnabled={windToggleEnabled}
+          showAirportLabels={showAirportLabels}
+          showRadar={showRadar}
+          radarSource={radarSource}
+          showVfrSectionals={showVfrSectionals}
+          darkenSectionalCharts={darkenSectionalCharts}
+          showSatellite={showSatellite}
+          autoMoveEnabled={autoMoveEnabled}
+          onRefreshAirport={handleRefreshAirport}
+        />
+      ) : (
+        <Map
+          key={MapRenderer.LEAFLET}
+          airportMETARs={airportMETARs}
+          center={NY_CENTER}
+          zoom={NY_ZOOM}
+          windToggleEnabled={windToggleEnabled}
+          showAirportLabels={showAirportLabels}
+          showRadar={showRadar}
+          radarSource={radarSource}
+          showVfrSectionals={showVfrSectionals}
+          darkenSectionalCharts={darkenSectionalCharts}
+          showSatellite={showSatellite}
+          onRefreshAirport={handleRefreshAirport}
+        />
+      )}
       <StatusBar
         lastUpdate={lastUpdate}
         isRefreshing={isRefreshing}
@@ -155,6 +183,12 @@ function App() {
         onShowRadarChange={setShowRadar}
         radarSource={radarSource}
         onRadarSourceChange={setRadarSource}
+        showVfrSectionals={showVfrSectionals}
+        onShowVfrSectionalsChange={setShowVfrSectionals}
+        darkenSectionalCharts={darkenSectionalCharts}
+        onDarkenSectionalChartsChange={setDarkenSectionalCharts}
+        mapRenderer={mapRenderer}
+        onMapRendererChange={setMapRenderer}
         showSatellite={showSatellite}
         onShowSatelliteChange={setShowSatellite}
         autoMoveEnabled={autoMoveEnabled}

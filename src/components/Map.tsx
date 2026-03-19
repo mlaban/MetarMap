@@ -1,10 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { AirportMETAR, fetchSingleAirport } from '../services/metarService';
+import { AirportMETAR } from '../services/metarService';
 import { FlightCategoryColors, FlightCategory } from '../types/flightCategory';
 import { getNextTAFCondition, decodeTAFPeriods } from '../utils/tafParser';
 import { RadarSource } from '../types/radar';
+import {
+  VFR_SECTIONAL_ATTRIBUTION,
+  VFR_SECTIONAL_LEAFLET_CLASS_NAME,
+  VFR_SECTIONAL_MAX_NATIVE_ZOOM,
+  VFR_SECTIONAL_OPACITY,
+  VFR_SECTIONAL_TILE_URL,
+} from '../constants/mapLayers';
 
 interface MapProps {
   airportMETARs: AirportMETAR[];
@@ -14,38 +21,28 @@ interface MapProps {
   showAirportLabels: boolean;
   showRadar: boolean;
   radarSource?: RadarSource;
+  showVfrSectionals: boolean;
+  darkenSectionalCharts: boolean;
   showSatellite: boolean;
   onRefreshAirport?: (icao: string) => Promise<void>;
 }
 
-export default function Map({ airportMETARs, center, zoom, windToggleEnabled, showAirportLabels, showRadar, radarSource = RadarSource.IOWA_NEXRAD_N0Q, showSatellite, onRefreshAirport }: MapProps) {
+export default function Map({ airportMETARs, center, zoom, showAirportLabels, showRadar, radarSource = RadarSource.IOWA_NEXRAD_N0Q, showVfrSectionals, darkenSectionalCharts }: MapProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.CircleMarker[]>([]);
   const coreMarkersRef = useRef<L.CircleMarker[]>([]);
   const hitBoxMarkersRef = useRef<L.CircleMarker[]>([]);
   const labelsRef = useRef<L.Marker[]>([]);
   const tafArrowsRef = useRef<L.Marker[]>([]);
-  const refreshingAirportsRef = useRef<Set<string>>(new Set());
   const previousCategoriesRef = useRef<globalThis.Map<string, FlightCategory>>(new globalThis.Map());
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const radarLayerRef = useRef<L.TileLayer | null>(null);
-  const satelliteLayerRef = useRef<L.TileLayer | null>(null);
-
-  // Helper function to generate a consistent delay based on ICAO code
-  const getStaggerDelay = (icao: string): number => {
-    // Create a hash from the ICAO code to get a consistent delay (0-1500ms)
-    let hash = 0;
-    for (let i = 0; i < icao.length; i++) {
-      hash = ((hash << 5) - hash) + icao.charCodeAt(i);
-      hash = hash & hash; // Convert to 32-bit integer
-    }
-    return Math.abs(hash) % 1500; // Delay between 0-1500ms
-  };
+  const vfrSectionalLayerRef = useRef<L.TileLayer | null>(null);
 
   useEffect(() => {
     // Initialize map
-    if (!mapRef.current) {
-      mapRef.current = L.map('map', {
+    if (!mapRef.current && containerRef.current) {
+      mapRef.current = L.map(containerRef.current, {
         center,
         zoom,
         zoomControl: true,
@@ -109,6 +106,35 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
 
     updateRadar();
   }, [showRadar, radarSource]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    if (vfrSectionalLayerRef.current) {
+      vfrSectionalLayerRef.current.remove();
+      vfrSectionalLayerRef.current = null;
+    }
+
+    if (showVfrSectionals) {
+      const sectionalLayerClassName = [
+        VFR_SECTIONAL_LEAFLET_CLASS_NAME,
+        darkenSectionalCharts ? 'leaflet-vfr-sectional-darken' : '',
+      ].filter(Boolean).join(' ');
+
+      vfrSectionalLayerRef.current = L.tileLayer(VFR_SECTIONAL_TILE_URL, {
+        attribution: VFR_SECTIONAL_ATTRIBUTION,
+        className: sectionalLayerClassName,
+        detectRetina: true,
+        opacity: VFR_SECTIONAL_OPACITY,
+        maxZoom: 19,
+        maxNativeZoom: VFR_SECTIONAL_MAX_NATIVE_ZOOM,
+        keepBuffer: 4,
+        zIndex: 50
+      });
+
+      vfrSectionalLayerRef.current.addTo(mapRef.current);
+    }
+  }, [showVfrSectionals, darkenSectionalCharts]);
 
   // Satellite layer disabled - tiles not working properly (showing all green)
   // TODO: Re-enable when a working satellite tile service is found
@@ -241,8 +267,8 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
       const hasHighGusts = windGust !== undefined && windGust >= 17;
       
       // Add LED glow effect to outer marker
-      marker.on('add', function() {
-        const element = this.getElement();
+      marker.on('add', () => {
+        const element = marker.getElement() as SVGElement | HTMLElement | null;
         if (element) {
           // Apply outer glow effect (scaled down for smaller markers)
           element.style.filter = `drop-shadow(0 0 1.5px ${color}) drop-shadow(0 0 3px ${color}) drop-shadow(0 0 4px ${color})`;
@@ -258,25 +284,25 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
           }
           
           // Add hover effect for brighter glow
-          element.addEventListener('mouseenter', function() {
-            this.style.filter = `drop-shadow(0 0 2px ${color}) drop-shadow(0 0 4px ${color}) drop-shadow(0 0 6px ${color}) drop-shadow(0 0 8px ${color})`;
+          element.addEventListener('mouseenter', () => {
+            element.style.filter = `drop-shadow(0 0 2px ${color}) drop-shadow(0 0 4px ${color}) drop-shadow(0 0 6px ${color}) drop-shadow(0 0 8px ${color})`;
             if (hasHighGusts) {
-              this.style.animationPlayState = 'paused';
+              element.style.animationPlayState = 'paused';
             }
           });
           
-          element.addEventListener('mouseleave', function() {
-            this.style.filter = `drop-shadow(0 0 1.5px ${color}) drop-shadow(0 0 3px ${color}) drop-shadow(0 0 4px ${color})`;
+          element.addEventListener('mouseleave', () => {
+            element.style.filter = `drop-shadow(0 0 1.5px ${color}) drop-shadow(0 0 3px ${color}) drop-shadow(0 0 4px ${color})`;
             if (hasHighGusts) {
-              this.style.animationPlayState = 'running';
+              element.style.animationPlayState = 'running';
             }
           });
         }
       });
 
       // Add bright glow to center core
-      coreMarker.on('add', function() {
-        const element = this.getElement();
+      coreMarker.on('add', () => {
+        const element = coreMarker.getElement() as SVGElement | HTMLElement | null;
         if (element) {
           element.style.filter = `drop-shadow(0 0 1px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 2px rgba(255, 255, 255, 0.6))`;
           element.style.transition = 'opacity 0.5s ease';
@@ -291,19 +317,6 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
         }
       });
 
-      // Add popup with airport info
-      const metarText = airportData?.metar?.rawOb || airportData?.metar?.rawText || 'No METAR available';
-      
-      // Handle visibility (convert meters to miles if needed)
-      let visibilityMi = airportData?.metar?.visibilityStatuteMi;
-      if (!visibilityMi && airportData?.metar?.visib !== undefined) {
-        visibilityMi = airportData.metar.visib * 0.000621371;
-      }
-      const visibility = visibilityMi 
-        ? `${visibilityMi.toFixed(1)} mi`
-        : 'N/A';
-      
-      // Handle wind (use wspd/wdir or windSpeedKt/windDirDegrees)
       const windDir = airportData?.metar?.wdir || airportData?.metar?.windDirDegrees;
       const windSpeed = airportData?.metar?.wspd || airportData?.metar?.windSpeedKt;
       const wind = windSpeed 
@@ -313,17 +326,21 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
       // Get TAF data
       const taf = airportMETARs.find(am => am.airport.icao === airport.icao)?.taf;
       const tafText = taf?.rawTAF || taf?.rawOb || taf?.rawText || 'No TAF available';
+      void wind;
+      void taf;
+      void tafText;
       
       // Determine trend (improving, worsening, or stable)
       const previousCategory = previousCategoriesRef.current.get(airport.icao);
       let trend: 'improving' | 'worsening' | 'stable' | null = null;
       
       if (previousCategory && previousCategory !== flightCategory) {
-        const categoryOrder = {
+        const categoryOrder: Record<FlightCategory, number> = {
           [FlightCategory.LIFR]: 0,
           [FlightCategory.IFR]: 1,
           [FlightCategory.MVFR]: 2,
           [FlightCategory.VFR]: 3,
+          [FlightCategory.UNKNOWN]: 1.5,
         };
         const prevOrder = categoryOrder[previousCategory] ?? 2;
         const currOrder = categoryOrder[flightCategory] ?? 2;
@@ -486,7 +503,7 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
       );
       
       // Bind popup to hit box marker (larger clickable area)
-      const popup = hitBoxMarker.bindPopup(popupContent);
+      hitBoxMarker.bindPopup(popupContent);
       
       // Make visible markers non-interactive so clicks go to hit box
       marker.options.interactive = false;
@@ -628,6 +645,5 @@ export default function Map({ airportMETARs, center, zoom, windToggleEnabled, sh
     });
   }, [showAirportLabels]);
 
-  return <div id="map" style={{ width: '100%', height: '100vh' }} />;
+  return <div ref={containerRef} style={{ width: '100%', height: '100vh' }} />;
 }
-

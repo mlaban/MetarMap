@@ -1,5 +1,6 @@
-import { FlightCategory, FlightCategoryColors } from '../types/flightCategory';
+﻿import { FlightCategory, FlightCategoryColors } from '../types/flightCategory';
 import { RadarSource, RadarSourceLabels } from '../types/radar';
+import { MapRenderer, MapRendererLabels } from '../types/mapRenderer';
 
 interface StatusBarProps {
   lastUpdate: Date | null;
@@ -12,6 +13,12 @@ interface StatusBarProps {
   onShowRadarChange: (show: boolean) => void;
   radarSource: RadarSource;
   onRadarSourceChange: (source: RadarSource) => void;
+  showVfrSectionals: boolean;
+  onShowVfrSectionalsChange: (show: boolean) => void;
+  darkenSectionalCharts: boolean;
+  onDarkenSectionalChartsChange: (enabled: boolean) => void;
+  mapRenderer: MapRenderer;
+  onMapRendererChange: (renderer: MapRenderer) => void;
   showSatellite: boolean;
   onShowSatelliteChange: (show: boolean) => void;
   autoMoveEnabled: boolean;
@@ -87,7 +94,9 @@ const BlinkingLegendDot = ({ color, label }: { color: string; label: string }) =
   );
 };
 
-export default function StatusBar({ lastUpdate, isRefreshing, windToggleEnabled, onWindToggleChange, showAirportLabels, onShowAirportLabelsChange, showRadar, onShowRadarChange, radarSource, onRadarSourceChange, showSatellite, onShowSatelliteChange, autoMoveEnabled, onAutoMoveChange }: StatusBarProps) {
+export default function StatusBar({ lastUpdate, isRefreshing, windToggleEnabled, onWindToggleChange, showAirportLabels, onShowAirportLabelsChange, showRadar, onShowRadarChange, radarSource, onRadarSourceChange, showVfrSectionals, onShowVfrSectionalsChange, darkenSectionalCharts, onDarkenSectionalChartsChange, mapRenderer, onMapRendererChange, autoMoveEnabled, onAutoMoveChange }: StatusBarProps) {
+  const autoMoveAvailable = mapRenderer === MapRenderer.CESIUM;
+
   return (
     <div style={{
       position: 'absolute',
@@ -199,12 +208,72 @@ export default function StatusBar({ lastUpdate, isRefreshing, windToggleEnabled,
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>
             <input
               type="checkbox"
-              checked={autoMoveEnabled}
-              onChange={(e) => onAutoMoveChange(e.target.checked)}
+              checked={showVfrSectionals}
+              onChange={(e) => onShowVfrSectionalsChange(e.target.checked)}
               style={{
                 width: '16px',
                 height: '16px',
                 cursor: 'pointer',
+                accentColor: '#4CAF50'
+              }}
+            />
+            <span style={{ color: '#cccccc' }}>VFR Sectionals</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>
+            <input
+              type="checkbox"
+              checked={darkenSectionalCharts}
+              onChange={(e) => onDarkenSectionalChartsChange(e.target.checked)}
+              style={{
+                width: '16px',
+                height: '16px',
+                cursor: 'pointer',
+                accentColor: '#4CAF50'
+              }}
+            />
+            <span style={{ color: '#cccccc' }}>Darken Charts</span>
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '12px', color: '#888' }}>Renderer:</span>
+            <select
+              value={mapRenderer}
+              onChange={(e) => onMapRendererChange(e.target.value as MapRenderer)}
+              style={{
+                backgroundColor: '#333',
+                color: '#fff',
+                border: '1px solid #555',
+                borderRadius: '4px',
+                fontSize: '11px',
+                padding: '2px 4px',
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              {Object.entries(MapRendererLabels).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+          <label
+            title={autoMoveAvailable ? 'Automatically move the globe camera' : 'Auto Move is only available in the Cesium renderer'}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: autoMoveAvailable ? 'pointer' : 'not-allowed',
+              fontSize: '12px',
+              opacity: autoMoveAvailable ? 1 : 0.55
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={autoMoveEnabled}
+              disabled={!autoMoveAvailable}
+              onChange={(e) => onAutoMoveChange(e.target.checked)}
+              style={{
+                width: '16px',
+                height: '16px',
+                cursor: autoMoveAvailable ? 'pointer' : 'not-allowed',
                 accentColor: '#4CAF50'
               }}
             />
@@ -230,4 +299,3 @@ export default function StatusBar({ lastUpdate, isRefreshing, windToggleEnabled,
     </div>
   );
 }
-

@@ -361,26 +361,6 @@ function parsePeriodData(text: string): Partial<DecodedTAFPeriod> {
 }
 
 /**
- * Parses timestamp - handles both Unix timestamp (seconds) and ISO string
- */
-function parseTimestamp(ts: any): Date {
-  if (!ts) return new Date();
-  if (typeof ts === 'string') {
-    // Try ISO string first
-    const date = new Date(ts);
-    if (!isNaN(date.getTime())) return date;
-    // Try Unix timestamp as string
-    const num = parseInt(ts);
-    if (!isNaN(num)) return new Date(num * 1000);
-  }
-  if (typeof ts === 'number') {
-    // If it's a very large number, assume milliseconds, otherwise seconds
-    return new Date(ts > 1e12 ? ts : ts * 1000);
-  }
-  return new Date();
-}
-
-/**
  * Parses TAF date/time group (e.g., "1103/1124" or "FM110600")
  */
 function parseTAFTimeGroup(timeGroup: string, issueDate: Date): Date {
